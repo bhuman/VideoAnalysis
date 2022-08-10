@@ -1,0 +1,44 @@
+[tool.black]
+line-length = 120
+target-version = ["py38"]
+
+[tool.isort]
+line_length = 120
+profile = "black"
+py_version = 38
+
+[tool.mypy]
+ignore_missing_imports = true
+# plugins = "numpy.typing.mypy_plugin"
+python_version = "3.8"
+show_error_codes = true
+warn_unused_ignores = true
+
+[tool.pylint.format]
+max-line-length = 120 # For black
+
+[tool.pylint.messages_control]
+enable = [
+    "useless-suppression", # Show useless pylint statements.
+]
+disable = [
+    "too-few-public-methods", # For data classes.
+    "missing-module-docstring",
+    "no-member", # Ignore pylints cv2 problems.
+    "invalid-name", # Ignore good names for now.
+    # Ignore to-many-* for now.
+    "too-many-locals",
+    "too-many-arguments",
+    "too-many-instance-attributes",
+    "too-many-branches",
+    "too-many-statements",
+    "too-many-boolean-expressions",
+    "too-many-nested-blocks",
+    # "fixme",
+]
+
+[tool.pyright]
+pythonVersion = "3.8"
+typeCheckingMode = "basic"
+
+reportMissingTypeStubs = false

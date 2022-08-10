@@ -1,0 +1,66 @@
+default_language_version:
+  python: python3.8
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+      - id: check-ast # Simply checks whether the files parse as valid python.
+      - id: check-added-large-files # Prevents giant files from being committed.
+      - id: check-builtin-literals # Requires literal syntax when initializing empty or zero python builtin types.
+      - id: check-case-conflict # Checks for files that would conflict in case-insensitive filesystems.
+      - id: check-docstring-first # Checks a common error of defining a docstring after code.
+      - id: check-json # Checks json files for parsable syntax.
+      - id: check-merge-conflict # Checks for files that contain merge conflict strings.
+      - id: check-symlinks # Checks for symlinks which do not point to anything.
+      - id: check-toml # Checks toml files for parsable syntax.
+      - id: check-yaml # Checks yaml files for parsable syntax.
+      - id: debug-statements # Checks for debugger imports and py37+ `breakpoint()` calls in python source.
+      - id: end-of-file-fixer # Ensures that a file is either empty, or ends with one newline.
+      - id: mixed-line-ending # Replaces or checks mixed line ending.
+      - id: trailing-whitespace # Trims trailing whitespace.
+        args: [--markdown-linebreak-ext=md] # Preserve Markdown hard linebreaks
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.10.1
+    hooks:
+      - id: isort
+
+  - repo: https://github.com/psf/black
+    rev: 22.6.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 5.0.2
+    hooks:
+      - id: flake8
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.9.0
+    hooks:
+      - id: python-check-blanket-noqa # Enforce that `noqa` annotations always occur with specific codes. Sample annotations: `# noqa: F401`, `# noqa: F401,W203`
+      - id: python-check-blanket-type-ignore # Enforce that `# type: ignore` annotations always occur with specific codes. Sample annotations: `# type: ignore[attr-defined]`, `# type: ignore[attr-defined, name-defined]`
+      - id: python-no-eval # A quick check for the `eval()` built-in function
+      - id: python-no-log-warn # A quick check for the deprecated `.warn()` method of python loggers.
+      - id: python-use-type-annotations # Enforce that python3.6+ type annotations are used instead of type comments
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v2.37.3
+    hooks:
+      - id: pyupgrade # Automatically upgrade syntax for newer versions.
+        name: Upgrade python syntax
+        args: [--py38-plus]
+
+  - repo: https://github.com/sondrelg/pep585-upgrade
+    rev: v1.0.1
+    hooks:
+      - id: upgrade-type-hints #  Upgrades type hints to new types introduced in PEP 585.
+        args: [ '--futures=true' ]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.971
+    hooks:
+      - id: mypy
+        args: []
+        additional_dependencies: [types-PyYAML]

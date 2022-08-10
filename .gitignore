@@ -1,0 +1,16 @@
+# Python
+__pycache__
+/venv/
+
+# Editor
+/.devcontainer
+/.vscode
+/.idea
+
+# Tool files
+/config/*Half.json
+/data
+/runs
+/src/multi-object-tracker
+/statistics
+/weights/yolov5n6.pt

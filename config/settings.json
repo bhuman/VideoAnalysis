@@ -1,0 +1,58 @@
+{
+    "calibration": {
+        "initial_camera_pose": {
+            "translation": [
+                0,
+                -4,
+                2.2
+            ],
+            "rotation": [
+                0,
+                45,
+                90
+            ]
+        },
+        "images": 150,
+        "step_size": 100,
+        "iterations": 10
+    },
+    "detector": {
+        "conf_thres": 0.25,
+        "iou_thres": 0.45,
+        "max_det": 11,
+        "device": "",
+        "half": false,
+        "dnn": false
+    },
+    "view": {
+        "tab": "Video",
+        "boxes": false,
+        "labels": false,
+        "field_lines": false,
+        "controlled_areas": false
+    },
+    "green_mask": {
+        "min": [
+            45,
+            32,
+            16
+        ],
+        "max": [
+            92,
+            255,
+            255
+        ]
+    },
+    "white_mask": {
+        "min": [
+            0,
+            0,
+            160
+        ],
+        "max": [
+            180,
+            100,
+            255
+        ]
+    }
+}
