@@ -154,7 +154,7 @@ dataset.
 ## Known Issues
 
 The app provided here is far from being finished. Therefore, there are a number of
-known issues, so of which are listed here:
+known issues, some of which are listed here:
 
   - The camera calibration only performs an extrinsic calibration, i.e. the
     intrinsic calibration of the camera must already be known. The app currently
@@ -162,7 +162,7 @@ known issues, so of which are listed here:
     also depends on a reasonable initial guess for the camera pose.
 
   - The game recording solution developed by Berlin United only records games when
-    the game state is not `Initial`. As a result, timeout are not recorded in the
+    the game state is not `Initial`. As a result, timeouts are not recorded in the
     videos. The app cannot handle situations, in which a timeout was taken after the
     first `Ready` state, because such a half would be recorded as two videos and it
     is assumed that videos always start with the first switch to `Ready`.
