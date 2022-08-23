@@ -8,6 +8,7 @@ __pycache__
 /.idea
 
 # Tool files
+/backgrounds
 /config/*Half.json
 /data
 /runs

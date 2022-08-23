@@ -1,6 +1,24 @@
 {
     "calibration": {
-        "initial_camera_pose": {
+        "initial_intrinsics": {
+            "optical_center": [
+                960.0,
+                540.0
+            ],
+            "focal_length": [
+                920.0,
+                920.0
+            ],
+            "k1": 0.18,
+            "k2": 0.15,
+            "k3": 0.1,
+            "superview": true,
+            "resolution": [
+                1920.0,
+                1080.0
+            ]
+        },
+        "initial_extrinsics": {
             "translation": [
                 0,
                 -4,
@@ -14,7 +32,8 @@
         },
         "images": 150,
         "step_size": 100,
-        "iterations": 10
+        "outlier_threshold": 3,
+        "iterations": 30
     },
     "detector": {
         "conf_thres": 0.25,

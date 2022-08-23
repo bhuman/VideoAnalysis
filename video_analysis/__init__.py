@@ -20,6 +20,8 @@ from .statistics import Statistics
 from .ui import UI
 from .world_model import WorldModel
 
+from .camera import Camera  # isort: skip
+
 ROOT = Path(__file__).resolve().parents[1]  # 1 folder up.
 
 
@@ -41,7 +43,6 @@ class VideoAnalysis:
         every_nth_frame: int,
         calibration: os.PathLike | str | None,
         force: bool,
-        skip: bool,
         verbose: bool,
         weights: os.PathLike | str,
         headless: bool,
@@ -55,7 +56,6 @@ class VideoAnalysis:
         :param every_nth_frame: Only use every nth frame.
         :param calibration: The camera calibration path.
         :param force: Force new camera calibration.
-        :param skip: Skip camera calibration even if none exists.
         :param verbose: Create verbose output during camera calibration.
         :param weights: Model.pt path(s).
         """
@@ -91,20 +91,19 @@ class VideoAnalysis:
         if self._dataset.webcam:
             cudnn.benchmark = True  # set True to speed up constant image size inference
 
-        self._world_model = WorldModel(self._dataset.fps, log, half == 2, field)
+        self._world_model = WorldModel(Camera(self._dataset.fps, self._settings), log, half == 2, field)
         self._world_model.camera.calibrate(
             video,
             imgsz,
             stride,
             pt,
             self._world_model.field,
-            self._settings,
             ROOT / "config" / (self._world_model.game_state.basename + ".json")
             if calibration is None
             else Path(calibration),
             force,
-            skip,
             verbose,
+            self._world_model.game_state.basename,
         )  # Calibrate the mapper
 
         # Initialize the statistics

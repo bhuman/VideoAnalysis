@@ -40,7 +40,6 @@ from video_analysis import VideoAnalysis  # noqa: E402
 @click.option("-n", "--every-nth-frame", type=int, default=10, show_default=True, help="Only process every nth frame.")
 @click.option("--headless", is_flag=True, help="Run without window.")
 @click.option("-f", "--force", is_flag=True, help="Force new camera calibration.")
-@click.option("-s", "--skip", is_flag=True, help="Skip camera calibration even if none exists.")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output during camera calibration.")
 def cli(
     video: str,
@@ -51,7 +50,6 @@ def cli(
     headless: bool,
     calibration: Path | None,
     force: bool,
-    skip: bool,
     verbose: bool,
 ) -> None:
     """Start the video analysis tool.
@@ -71,7 +69,6 @@ def cli(
         every_nth_frame=every_nth_frame,
         calibration=calibration,
         force=force,
-        skip=skip,
         verbose=verbose,
         weights=ROOT / "weights" / ("best.mlmodel" if platform.system() == "Darwin" else "best.pt"),
         headless=headless,

@@ -28,13 +28,19 @@ on an M1 Apple Neural Engine.
 *<div align="center">Confusion matrix of ball and player colors in the test set</div>*
 
 
-### Extrinsic Camera Calibration
+### Camera Calibration
 
 To transform the detections from image coordinates into field coordinates, an
 intrinsic and an extrinsic camera calibration are needed. We adapted the code
-provided by the team Berlin United [[2]](#ref) and added an inverse transformation
-from field coordinates back into the image. The calibration is performed before the
-first playback of a game video and then stored for later uses.
+provided by the team Berlin United [[2]](#ref) that offered the ability to optimize
+the extrinsic camera calibration using a hard-coded intrinsic calibration. We added
+the optimization of the intrinsic calibration together with the extrinsic one. We
+also added an inverse transformation from field coordinates back into the image.
+The calibration is performed on a background image that is computed from many
+images of the video to eliminate moving objects from the field to get a clear view
+at the field lines. This image is computed before the first playback of the game
+video and stored for later use. The calibration is also performed at this time and
+stored as well.
 
 
 ### World Model
@@ -123,10 +129,6 @@ locale-aware version of the comma-separated values format.
     this calibration will be used during further playbacks of the same video. This
     switch overwrites this behavior.
 
-  - `-s`, `--skip`: Skips the camera calibration even if none exists. This can be
-    useful for starting the app quickly to first manually calibrate the green and
-    white before attempting a camera calibration.
-
   - `-v`, `--verbose`: Writes additional information to the terminal while
     calibrating and visualizes the results in some PNG files under the path
     `runs/camera/run_*`.
@@ -156,10 +158,8 @@ dataset.
 The app provided here is far from being finished. Therefore, there are a number of
 known issues, some of which are listed here:
 
-  - The camera calibration only performs an extrinsic calibration, i.e. the
-    intrinsic calibration of the camera must already be known. The app currently
-    only supports a GoPro HERO 5 camera in wide mode. In addition, the calibration
-    also depends on a reasonable initial guess for the camera pose.
+  - The camera calibration depends on reasonable initial guesses for the camera pose
+    and the intrinsic camera parameters.
 
   - The game recording solution developed by Berlin United only records games when
     the game state is not `Initial`. As a result, timeouts are not recorded in the

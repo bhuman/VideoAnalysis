@@ -23,18 +23,18 @@ class WorldModel:
     It also contains a reference to the camera, because it is required by many computations.
     """
 
-    def __init__(self, fps: float, log: os.PathLike | str, snd_half: bool, field: os.PathLike | str | None) -> None:
+    def __init__(self, camera: Camera, log: os.PathLike | str, snd_half: bool, field: os.PathLike | str | None) -> None:
         """Initialize the world model.
 
-        :param fps: The frames per seconds the video is played back with. Time advances by
-        `1 / fps` with each frame.
+        :param camera: Information about the camera.
         :param log: The path to the GameController log that belongs to the video.
         :param snd_half: Is the video showing the second half of the game?
         :param field: The path of the JSON file that specifies the field dimensions. If
         `None`, the field dimension are automatically selected based on the year the game
         took place in.
         """
-        self.timestamp = -1 / fps
+        self.camera: Camera = camera
+        self.timestamp = -1 / camera.fps
         self.game_state: GameState = GameState(log, snd_half)
 
         if field is None:
@@ -44,7 +44,6 @@ class WorldModel:
                 field = ROOT / "config" / "field_dimensions2020.json"
 
         self.field: Field = Field(field, self)
-        self.camera: Camera = Camera(fps)
         self.ball: Ball = Ball(self)
         self.players: Players = Players(self)
 
