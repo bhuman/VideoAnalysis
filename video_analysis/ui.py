@@ -80,6 +80,13 @@ class UI:
             with dpg.menu_bar():
                 with dpg.menu(label="View"):
                     dpg.add_menu_item(
+                        label="Background",
+                        check=True,
+                        default_value=self._settings["view"]["background"],
+                        callback=lambda sender, data, _: self._background_changed(data),
+                    )
+                    dpg.add_separator()
+                    dpg.add_menu_item(
                         label="None",
                         check=True,
                         default_value=not self._settings["view"]["boxes"],
@@ -278,6 +285,13 @@ class UI:
         :param tab: The name of the tab that was activated.
         """
         self._settings["view"]["tab"] = tab
+
+    def _background_changed(self, checked: bool) -> None:
+        """This method is called when the background menu item is selected.
+
+        :param activated: Was the menu item checked?
+        """
+        self._settings["view"]["background"] = checked
 
     def _boxes_changed(self, sender: str) -> None:
         """This method is called when the boxes radio buttons are selected in the menu.

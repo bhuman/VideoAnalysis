@@ -45,6 +45,7 @@
     },
     "view": {
         "tab": "Video",
+        "background": false,
         "boxes": false,
         "labels": false,
         "field_lines": false,

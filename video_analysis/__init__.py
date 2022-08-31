@@ -171,7 +171,9 @@ class VideoAnalysis:
         if self._settings["view"]["tab"] == "Field" or self._settings["view"]["tab"] == "Heat Map":
             self._draw_field()
         else:
-            self._draw_image(image)
+            self._draw_image(
+                np.array(self._world_model.camera.background) if self._settings["view"]["background"] else image
+            )
 
     def _draw_image(self, image: npt.NDArray[np.uint8]) -> None:
         """Draws an image view.

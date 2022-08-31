@@ -167,6 +167,8 @@ class Camera:
     points to the right. The second dimension points away from the camera. The third dimension
     points upward. World coordinates are in meters.
     This class also stores the number of frames per second at which the video is played back.
+    In addition, the background image, i.e. the field without referees and robots, is computed
+    and can be accessed.
     """
 
     def __init__(self, fps: float, settings: dict[str, Any]) -> None:
@@ -177,6 +179,7 @@ class Camera:
         """
         self.fps: float = fps
         self._settings: dict[str, Any] = settings
+        self.background: cv2.Mat | None = None
         self._extrinsics: Extrinsics | None = None
         self.intrinsics: Intrinsics | None = None
 
@@ -211,6 +214,14 @@ class Camera:
         :param basename: A name that is used to create the file name for storing or loading
         background images.
         """
+        background_path = (
+            ROOT
+            / "backgrounds"
+            / f"{basename}_{self._settings['calibration']['images']}_{self._settings['calibration']['step_size']}.jpg"
+        )
+        if background_path.is_file():
+            self.background = cv2.imread(str(background_path))
+
         if not force and calibration_path.is_file():
             with calibration_path.open(encoding="UTF-8", newline="\n") as file:
                 calibration: dict[str, Any] = json.load(file)
@@ -229,19 +240,12 @@ class Camera:
             source, imgsz, stride, pt, step=self._settings["calibration"]["step_size"]
         )  # We only select every hundredth image for a better quality of the calibration
 
-        background_path = (
-            ROOT
-            / "backgrounds"
-            / f"{basename}_{self._settings['calibration']['images']}_{self._settings['calibration']['step_size']}.jpg"
-        )
-        if background_path.is_file():
-            background = cv2.imread(str(background_path))
-        else:
-            background = self._read_video_background(dataset, self._settings["calibration"]["images"])
+        if self.background is None:
+            self.background = self._read_video_background(dataset, self._settings["calibration"]["images"])
             (ROOT / "backgrounds").mkdir(parents=True, exist_ok=True)
-            cv2.imwrite(str(background_path), background)
+            cv2.imwrite(str(background_path), self.background)
 
-        points_original = self._detect_lines(background)
+        points_original = self._detect_lines(self.background)
         try:
             points_reduced, points_transformed = self._align_camera(field, points_original)
             assert self.intrinsics is not None
@@ -267,10 +271,10 @@ class Camera:
                 _, (ax1, ax2) = plt.subplots(2, 1)  # pyright: ignore
                 ax1.set_aspect("equal")
                 # Here, the first parameter is for the horizontal axis, the second for the vertical one.
-                ax1.plot(points_original[:, 0], background.shape[0] - points_original[:, 1], ".")
+                ax1.plot(points_original[:, 0], self.background.shape[0] - points_original[:, 1], ".")
                 ax1.set_title("Detected line points")
                 ax2.set_aspect("equal")
-                ax2.plot(points_reduced[:, 0], background.shape[0] - points_reduced[:, 1], ".")
+                ax2.plot(points_reduced[:, 0], self.background.shape[0] - points_reduced[:, 1], ".")
                 ax2.set_title("reduced line points")
                 plt.savefig(path / "before.png")
                 _, (ax3) = plt.subplots(1, 1)
