@@ -138,6 +138,70 @@ locale-aware version of the comma-separated values format.
   - `-h`, `--help`: Show the help message and exit.
 
 
+### Camera Calibration
+
+The camera calibration runs in three steps:
+
+ 1. First, a background image is computed, i.e. ideally an image of an empty field.
+    Since a large part of the video is read to compute this image, it takes quite a
+    while. However, this is only done once per video and the resulting image is
+    stored in the directory `backgrounds`. The parameters used to compute the image
+    can be configured in the file `config/settings.json` in the section
+    `calibration`:
+
+      - `images`: The number of images to use.
+
+      - `step_size`: Corresponds to the number of images skipped between two that
+        are used (plus one), i.e. with a `step_size` of 1 every image is used.
+
+    These two numbers are also part of the filename chosen for the background image.
+    If these parameters are changed, another background image will be calculated
+    when the app is started the next time.
+
+ 2. The field lines are detected in the background image. For this, two colors are
+    detected: green and white. Green represents the area of the field. The idea is
+    to only accept white pixels that are located on the field, i.e. surrounded by
+    green pixels. The approach is to detect both colors using minimum and maximum
+    values in the HSV color space and then perform a couple of morphological image
+    processing operations to, e.g., close gaps in the detection. The color
+    boundaries can be configured interactively by selecting the tabs `Green` or
+    `White` and then the corresponding menu as well. In addition, `View/Background`
+    can be activated. The values selected are stored in the file
+    `config/settings.json` in the sections `green_mask` and `white_mask`. Please
+    note that the range of the hue values is 0° ... 180° in the file although the
+    color picker uses a range of 0 ... 255. The `green_mask` is also used to create
+    the 3D effect when drawing to the video image. Most of the drawings are only
+    drawn onto the green areas of the image. This creates the illusion that they
+    are hidden behind the (non-green) objects on the field.
+
+ 3. The actual optimization of the intrinsic and extrinsic camera parameters is
+    performed. It starts from an initial guess, which is taken from the file
+    `config/settings.json` in the section `calibration`. The `initial_intrinsics`
+    contain the initial values for the intrinsic parameters. All the values except
+    for `superview` and `resolution` are adapted during the optimization. The
+    `initial_extrinsics` describe the initial guess for the camera's pose. The
+    translation is specified in meters. Usually, the first dimension points to the
+    right, the second one away from the camera, and the third one upwards. The
+    origin is at the center of the field. The rotations are given in degrees. The
+    initial guess is rather important, because it is also used to discard outliers
+    from the detected field lines. If a point on a field line is further away than
+    `outlier_threshold` (in m), it will not be used for the calibration.
+    `iterations` defines the maximum number of iterations used during optimization.
+
+All three steps are only performed once. However, the command line parameter
+`--force` (or `-f`) can be used to repeat the steps 2 and 3. In addition, the
+parameter `--verbose` creates more information about the calibration process. On the
+one hand, it creates a directory in `runs/camera` containing two images.
+`before.png` contains two graphs showing the detected field line points before and
+after the outlier elimination. In particular the latter is important, because if it
+does not contain the whole field anymore, the initial guess of the camera parameters
+must be adapted. `after.png` shows the corrected field line points. It should look
+like a bird's eye view of the field, i.e. with 90° angles in all the corners. This
+graph is basically a representation of how well the calibration worked. On the other
+hand, the verbose mode prints the calibration error for each iteration (in m) to
+the terminal.
+
+
 ## Training the Network
 
 [Here](doc/TRAINING.md) is described, how to train the network from scratch.
@@ -185,6 +249,7 @@ known issues, some of which are listed here:
 
   - There are many "magic numbers" in the code. Some of them are not even defined as
     named constants.
+
 
 ## <a name="ref"></a>References
 
