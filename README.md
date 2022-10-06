@@ -253,8 +253,14 @@ known issues, some of which are listed here:
 
 ## <a name="ref"></a>References
 
- 1. Glenn Jocher et al.: [ultralytics/yolov5: v3.1 – Bug Fixes and Performance
-    Improvements](https://doi.org/10.5281/zenodo.4154370). Zenodo.
+ 1. Glenn Jocher, Ayush Chaurasia, Alex Stoken, Jirka Borovec, NanoCode012, Yonghye
+    Kwon, TaoXie, Jiacong Fang, imyhxy, Kalen Michael, Lorna, Abhiram V, Diego
+    Montes, Jebastin Nadar, Laughing, tkianai, yxNONG, Piotr Skalski, Zhiqiang Wang,
+    Adam Hogan, Cristi Fati, Lorenzo Mammana, AlexWang1900, Deep Patel, Ding Yiwei,
+    Felix You, Jan Hajek, Laurentiu Diaconu, Mai Thanh Minh: [ultralytics/yolov5:
+    v6.1 – TensorRT, TensorFlow Edge TPU and OpenVINO Export and
+    Inference](https://doi.org/10.5281/zenodo.6222936). doi: 10.5281/zenodo.6222936,
+    February 2022.
 
  2. Benjamin Schlotter (2020): [Analyse von RoboCup Spielen Erkennen und
     Lokalisieren von Nao Robotern](https://www.naoteamhumboldt.de/wp-content/papercite-data/pdf/2020_studienarbeit_schlotter.pdf).
