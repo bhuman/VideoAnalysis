@@ -134,7 +134,7 @@ if __name__ == "__main__":
         <csv-file> - The csv file so show.
         <images>   - The folder containing the images. Defaults to folder "images" next to <csv-file>.
         """
-        main(csv_file, csv_file.parent / "images" if images is None else images)
+        main(csv_file, csv_file.parent if images is None else images)
 
     logging.basicConfig(level=logging.INFO, format="{levelname:>8}: {message}", style="{")
     cli()  # pylint: disable=no-value-for-parameter
