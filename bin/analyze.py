@@ -20,7 +20,11 @@ from video_analysis import VideoAnalysis  # noqa: E402
 @click.version_option(version="1.0.0")
 @click.argument("video", type=str)
 @click.option(
-    "-l", "--log", type=click.Path(exists=True, dir_okay=False, path_type=Path), help="The GameController log path."
+    "-l",
+    "--log",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="The GameController log path.",
 )
 @click.option(
     "-f",
