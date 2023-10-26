@@ -5,7 +5,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import numpy.typing as npt
-from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from yolov5.utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
 from yolov5.utils.general import check_file
 
 
@@ -15,7 +15,7 @@ class SourceAdapter:
     This class is loosely based on code from YOLOv5's detect.py.
     """
 
-    def __init__(self, source: str, imgsz: list[int], stride: int, pt: bool, step: int = 1) -> None:
+    def __init__(self, source: str, imgsz: list[int] | int, stride: int, pt: bool, step: int = 1) -> None:
         """Initialize this provider.
 
         :param source: Path or URL of the video or a folder with images. Could also be the
@@ -34,11 +34,11 @@ class SourceAdapter:
             source = check_file(source)
 
         if self.webcam:
-            self._dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)
+            self._dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)  # type: ignore[arg-type]
             assert len(self._dataset) == 1
             self.fps = self._dataset.fps[0]
         else:
-            self._dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
+            self._dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)  # type: ignore[arg-type]
             assert self._dataset.cap is not None
             self.fps = self._dataset.cap.get(cv2.CAP_PROP_FPS)
         self.fps /= step

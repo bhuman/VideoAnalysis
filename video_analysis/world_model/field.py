@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from math import ceil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cairo
 import cv2
@@ -17,17 +17,16 @@ if TYPE_CHECKING:
 class Field:
     """The field model, i.e. the dimensions of the field."""
 
-    _max_line_length = 2
-    """The maximum length of a single line drawn. Longer lines are split."""
-
-    def __init__(self, path: os.PathLike | str, world_model: WorldModel) -> None:
+    def __init__(self, path: os.PathLike | str, world_model: WorldModel, settings: dict[str, Any]) -> None:
         """Initialize the field model by loading it from a file.
 
         :param path: The path to the JSON file that contains the field dimensions.
         The file uses the format that was defined in section 4.8 of the 2021 SPL rule book,
         modified by removing the word "Box".
+        :param settings: The settings used to draw the field.
         """
         self._world_model: WorldModel = world_model
+        self._max_line_length: float = settings["world_model"]["max_line_length"]
         with open(path, encoding="UTF-8") as file:
             dimensions = json.load(file)
             self.field_length = dimensions["field"]["length"]
@@ -175,7 +174,13 @@ class Field:
         for polyline_in_image in self._lines_in_image:
             cv2.polylines(image, [polyline_in_image.astype(np.int32)], False, (2, 2, 2), 2)
 
-    def _split(self, points: npt.NDArray[np.float32]):
+    def _split(self, points: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+        """Split lines into smaller lines that are not longer than _max_line_length.
+        This allows to draw them as curved lines in onto the image.
+
+        :param points: An array of 2D points describing a polyline.
+        :return: The same polyline, but with more and shorter individual lines.
+        """
         result = []
         if len(points) > 0:
             result.append(points[0])

@@ -8,7 +8,7 @@ import cv2
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from .world_model.game_state import Team
+from .world_model.team import Team
 
 
 class Size(NamedTuple):
@@ -22,24 +22,23 @@ class UI:
     """The UI of the app.
 
     It is displayed when this class is instantiated. The method render must be called regularly to update the UI.
-    The size of the window is hardcoded. Statistics can be set through the method set_value. Look at the source code
-    below to get a list of the categories that can be used. The state of the UI is stored in the settings in the
-    group "view".
+    The size of the window is dynamic. Statistics can be set through the method set_value. The state of the UI is
+    stored in the settings in the groups "window" and "view".
     """
 
-    _window_size = Size(
-        1280 if platform.system() != "Windows" else 1300, 541 if platform.system() != "Windows" else 580
+    """The number of pixels the image smaller than the window."""
+    _window_to_image_size = Size(
+        434 if platform.system() != "Windows" else 454, 64 if platform.system() != "Windows" else 103
     )
-    """The size of the main window in pixels."""
 
-    _image_size = Size(846, 476)
-    """The size of area that shows the images from the game in pixels."""
+    _remaining_to_table_width = 35
+    """Number of spare pixels after placing both tables and the image."""
 
-    _field_size = Size(670, 476)
-    """The size of the field views in pixels. The height should be the same as in _image_size."""
+    _table_to_bar_width = 140
+    """Number of pixels spent in tables except for the value bars."""
 
-    _column_width = 60
-    """The width of the progress bars."""
+    _window_to_table_height_diff = _window_to_image_size.height - 2
+    """The number of pixels the tables are less high than the window."""
 
     def __init__(self, categories: dict[str, list], teams: tuple[Team, Team], settings: dict[str, Any]) -> None:
         """Constructor. Sets up the window.
@@ -55,17 +54,19 @@ class UI:
         dpg.create_context()
         dpg.create_viewport(
             title="B-Human's Video Analysis",
-            x_pos=0,
-            y_pos=0,
-            width=self._window_size.width,
-            height=self._window_size.height,
-            resizable=False,
+            x_pos=settings["window"]["x"],
+            y_pos=settings["window"]["y"],
+            width=settings["window"]["width"],
+            height=settings["window"]["height"],
+            min_width=self._window_to_image_size.width + 320,
+            min_height=self._window_to_image_size.height + 180,
+            resizable=True,
             vsync=True,
         )
 
         # Create placeholders for the image and field views shown in the tabs.
-        image = np.zeros((self._image_size.height, self._image_size.width, 4), np.uint8)
-        field = np.zeros((self._field_size.height, self._field_size.width, 4), np.uint8)
+        image = np.zeros((1080, 1920, 4), np.uint8)
+        field = np.zeros((740, 1040, 4), np.uint8)
 
         # Register the image and two field views as textures to be used in the three tabs.
         with dpg.texture_registry():
@@ -76,7 +77,9 @@ class UI:
             dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="white")  # pyright: ignore
 
         # Create the whole ui (menu, team 0 left, tabs center, team 1 right).
-        with dpg.window(no_title_bar=True, tag="main", width=self._window_size.width, height=self._window_size.height):
+        with dpg.window(
+            no_title_bar=True, tag="main", width=settings["window"]["width"], height=settings["window"]["height"]
+        ):
             with dpg.menu_bar():
                 with dpg.menu(label="View"):
                     dpg.add_menu_item(
@@ -132,22 +135,31 @@ class UI:
             with dpg.group(horizontal=True):
                 self._team_info(0)
                 with dpg.table(header_row=False, policy=dpg.mvTable_SizingFixedFit, no_host_extendX=True):
-                    dpg.add_table_column(width_fixed=True, init_width_or_weight=self._image_size.width)
+                    dpg.add_table_column()
                     with dpg.table_row():
                         with dpg.tab_bar(callback=lambda sender, data, _: self._tab_changed(data), tag="tab"):
                             with dpg.tab(label="Video", tag="Video"):
-                                dpg.add_image("video")
+                                dpg.add_image("video", tag="video_image")
                             with dpg.tab(label="Field", tag="Field"):
-                                dpg.add_image("field", indent=(self._image_size.width - self._field_size.width) // 2)
+                                with dpg.group(horizontal=True, horizontal_spacing=0, tag="field_group"):
+                                    dpg.add_image("field", tag="field_image")
+                                    dpg.add_spacer(tag="field_padding")
                             with dpg.tab(label="Heat Map", tag="Heat Map"):
-                                dpg.add_image("heatmap", indent=(self._image_size.width - self._field_size.width) // 2)
+                                with dpg.group(horizontal=True, horizontal_spacing=0, tag="heatmap_group"):
+                                    dpg.add_image("heatmap", tag="heatmap_image")
+                                    dpg.add_spacer(tag="heatmap_padding")
                             with dpg.tab(label="Green", tag="Green"):
-                                dpg.add_image("green")
+                                dpg.add_image("green", tag="green_image")
                             with dpg.tab(label="White", tag="White"):
-                                dpg.add_image("white")
+                                dpg.add_image("white", tag="white_image")
                         dpg.set_value("tab", self._settings["view"]["tab"])
                 self._team_info(1)
         dpg.set_primary_window("main", True)
+
+        # Register resize handler.
+        with dpg.item_handler_registry(tag="main_handler"):
+            dpg.add_item_resize_handler(callback=lambda: self._size_changed())
+        dpg.bind_item_handler_registry("main", "main_handler")
 
         # Show the UI.
         dpg.setup_dearpygui()
@@ -179,9 +191,6 @@ class UI:
         :param type: The type of the view to replace ("video", "green", or "white")".
         :param image: The new image.
         """
-        image = cv2.resize(
-            image, (0, 0), fx=self._image_size.width / image.shape[1], fy=self._image_size.height / image.shape[0]
-        )
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGRA)
         image = cv2.normalize(
             image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F  # pyright: ignore # Wrong stubs.
@@ -194,14 +203,17 @@ class UI:
         :param type_: The type of the view to replace ("field" or "heatmap").
         :param field: The new field drawing.
         """
-        field = cv2.resize(
-            field, (0, 0), fx=self._field_size.width / field.shape[1], fy=self._field_size.height / field.shape[0]
-        )
         field = cv2.cvtColor(field, cv2.COLOR_RGB2BGRA)
         field = cv2.normalize(
             field, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F  # pyright: ignore # Wrong stubs.
         )
         dpg.set_value(type_, field)
+
+    def save_state(self):
+        """Save window state in settings."""
+        self._settings["window"]["x"], self._settings["window"]["y"] = dpg.get_viewport_pos()
+        self._settings["window"]["width"] = dpg.get_viewport_width()
+        self._settings["window"]["height"] = dpg.get_viewport_height()
 
     def _add_color_picker(self, color: str, bound: str):
         """Add a HSV color picker.
@@ -247,21 +259,22 @@ class UI:
         """
         with dpg.group():
             dpg.add_text(self._teams[team].name)
-            with dpg.table(header_row=False, policy=dpg.mvTable_SizingFixedFit, no_host_extendX=True):
-                dpg.add_table_column()
-                dpg.add_table_column(width_fixed=True, init_width_or_weight=self._column_width)
-                for category, values in self._categories.items():
-                    if len(values) >= 2:
-                        with dpg.table_row():
-                            dpg.add_text((category if len(values) < 4 else values[3]) + ":")
-                            dpg.add_progress_bar(
-                                default_value=values[team] / (values[0] + values[1])
-                                if values[0] + values[1] > 0
-                                else 0,
-                                overlay=str(values[team]) + ("" if len(values) < 3 else values[2]),
-                                width=-1,
-                                tag=category + str(team),
-                            )
+            with dpg.child_window(border=False, tag="team" + str(team), no_scrollbar=True):
+                with dpg.table(header_row=False, policy=dpg.mvTable_SizingFixedFit, no_host_extendX=True):
+                    dpg.add_table_column()
+                    dpg.add_table_column()
+                    for category, values in self._categories.items():
+                        if len(values) >= 2:
+                            with dpg.table_row():
+                                dpg.add_text((category if len(values) < 4 else values[3]) + ":")
+                                dpg.add_progress_bar(
+                                    default_value=values[team] / (values[0] + values[1])
+                                    if values[0] + values[1] > 0
+                                    else 0,
+                                    overlay=str(values[team]) + ("" if len(values) < 3 else values[2]),
+                                    width=-1,
+                                    tag=category + str(team),
+                                )
 
     @staticmethod
     def _set_progress(tag: str, value: float, overlay: str) -> None:
@@ -275,8 +288,10 @@ class UI:
         :param overlay: The overlay drawn over the bar.
         """
         dpg.add_text(tag="temp", before=tag)
+        width = dpg.get_item_width(tag)
+        assert width is not None
         dpg.delete_item(tag)
-        dpg.add_progress_bar(default_value=value, overlay=overlay, width=-1, tag=tag, before="temp")
+        dpg.add_progress_bar(default_value=value, overlay=overlay, width=width, tag=tag, before="temp")
         dpg.delete_item("temp")
 
     def _tab_changed(self, tab: str) -> None:
@@ -284,7 +299,12 @@ class UI:
 
         :param tab: The name of the tab that was activated.
         """
-        self._settings["view"]["tab"] = tab
+        if isinstance(tab, str):
+            self._settings["view"]["tab"] = tab
+        else:
+            for alias in dpg.get_aliases():
+                if dpg.get_alias_id(alias) is tab:
+                    self._settings["view"]["tab"] = alias
 
     def _background_changed(self, checked: bool) -> None:
         """This method is called when the background menu item is selected.
@@ -330,3 +350,57 @@ class UI:
         if hsv[0] == 0 and sender[6:] == "max":
             hsv[0] = 180
         self._settings[sender[:5] + "_mask"][sender[6:]] = hsv
+
+    def _size_changed(self):
+        """This method is called when the size of the main window changes."""
+        # Compute all sizes
+        width, height = dpg.get_item_rect_size("main")
+        image_width = width - self._window_to_image_size.width
+        image_height = min(height - self._window_to_image_size.height, image_width * 9 / 16)
+        image_width = min(image_width, image_height * 16 / 9)
+        field_width = image_height * 4 / 3
+        left_padding = (int(image_width) - int(field_width)) // 2
+        right_padding = int(image_width) - int(field_width) - left_padding
+        table_width = int(width - image_width - self._remaining_to_table_width) // 2
+        table_height = height - self._window_to_table_height_diff
+        bar_width = int(table_width - self._table_to_bar_width)
+
+        # Delete old images
+        dpg.delete_item("video_image")
+        dpg.delete_item("field_image")
+        dpg.delete_item("heatmap_image")
+        dpg.delete_item("green_image")
+        dpg.delete_item("white_image")
+
+        # Replace them with new images
+        dpg.add_image("video", parent="Video", width=int(image_width), height=int(image_height), tag="video_image")
+        dpg.add_image(
+            "field",
+            parent="field_group",
+            width=int(field_width),
+            height=int(image_height),
+            indent=left_padding,
+            before="field_padding",
+            tag="field_image",
+        )
+        dpg.add_image(
+            "heatmap",
+            parent="heatmap_group",
+            width=int(field_width),
+            height=int(image_height),
+            indent=left_padding,
+            before="heatmap_padding",
+            tag="heatmap_image",
+        )
+        dpg.add_image("green", parent="Green", width=int(image_width), height=int(image_height), tag="green_image")
+        dpg.add_image("white", parent="White", width=int(image_width), height=int(image_height), tag="white_image")
+
+        # Adapt a few sizes
+        dpg.set_item_width("field_padding", right_padding)
+        dpg.set_item_width("heatmap_padding", right_padding)
+        dpg.set_item_width("team0", table_width)
+        dpg.set_item_height("team0", table_height)
+        dpg.set_item_width("team1", table_width)
+        dpg.set_item_height("team1", table_height)
+        dpg.set_item_width("Goal for0", bar_width)
+        dpg.set_item_width("Goal for1", bar_width)

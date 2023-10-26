@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import cairo
 import numpy as np
@@ -23,7 +24,14 @@ class WorldModel:
     It also contains a reference to the camera, because it is required by many computations.
     """
 
-    def __init__(self, camera: Camera, log: os.PathLike | str, snd_half: bool, field: os.PathLike | str | None) -> None:
+    def __init__(
+        self,
+        camera: Camera,
+        log: os.PathLike | str,
+        snd_half: bool,
+        field: os.PathLike | str | None,
+        settings: dict[str, Any],
+    ) -> None:
         """Initialize the world model.
 
         :param camera: Information about the camera.
@@ -32,10 +40,11 @@ class WorldModel:
         :param field: The path of the JSON file that specifies the field dimensions. If
         `None`, the field dimension are automatically selected based on the year the game
         took place in.
+        :param settings: The settings used to compute the world model.
         """
         self.camera: Camera = camera
         self.timestamp = -1 / camera.fps
-        self.game_state: GameState = GameState(log, snd_half)
+        self.game_state: GameState = GameState(log, snd_half, settings)
 
         if field is None:
             if self.game_state.basename[:4] < "2020":
@@ -43,9 +52,9 @@ class WorldModel:
             else:
                 field = ROOT / "config" / "field_dimensions2020.json"
 
-        self.field: Field = Field(field, self)
-        self.ball: Ball = Ball(self)
-        self.players: Players = Players(self)
+        self.field: Field = Field(field, self, settings)
+        self.ball: Ball = Ball(self, settings)
+        self.players: Players = Players(self, settings)
 
     def update(self, detections: npt.NDArray[np.float_]) -> None:
         """Update the world model based on the detection made and the progress of time.

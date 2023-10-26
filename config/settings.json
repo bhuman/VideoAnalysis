@@ -38,10 +38,16 @@
     "detector": {
         "conf_thres": 0.25,
         "iou_thres": 0.45,
-        "max_det": 11,
+        "max_det": 15,
         "device": "",
         "half": false,
         "dnn": false
+    },
+    "window": {
+        "x": 0,
+        "y": 66,
+        "width": 1280,
+        "height": 519
     },
     "view": {
         "tab": "Video",
@@ -74,5 +80,20 @@
             100,
             255
         ]
+    },
+    "world_model": {
+        "max_ball_velocity": 2,
+        "player_lost_delay": 5,
+        "player_position_tolerance": 0.5,
+        "player_max_speed": 0.4,
+        "color_memory_duration": 20,
+        "border_tolerance": 3,
+        "upright_center_above_ground": 0.26,
+        "fallen_center_above_ground": 0.08,
+        "max_line_length": 2
+    },
+    "log_parser": {
+        "video_start_delay": 2.2,
+        "video_stop_delay": 0.8
     }
 }

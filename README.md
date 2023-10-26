@@ -21,8 +21,8 @@ video.*
 
 A YOLOv5 [[1]](#ref) network was trained with an input resolution of 1920x1080 with
 bounding boxes of the ball and the players including their jersey colors. Only 682
-images were actually used at a 70/20/10 split. The inference takes ~55 ms per image
-on an M1 Apple Neural Engine.
+images were actually used at a 70/20/10 split. The inference takes ~39 ms per image
+on an Apple M1 Max processor.
 
 ![](doc/confusion_matrix.png)
 *<div align="center">Confusion matrix of ball and player colors in the test set</div>*
@@ -40,7 +40,7 @@ The calibration is performed on a background image that is computed from many
 images of the video to eliminate moving objects from the field to get a clear view
 at the field lines. This image is computed before the first playback of the game
 video and stored for later use. The calibration is also performed at this time and
-stored as well.
+stored as well. More details are given [here](#cc).
 
 
 ### World Model
@@ -75,25 +75,27 @@ areas.
 
 ## Installing
 
-This repository uses Python 3 (tested with Python 3.8 and 3.9). Since Python wheels
+This repository uses Python 3 (tested with Python 3.10). Since Python wheels
 might be compiled from source, the usual C/C++ build tools must be installed. It is
 probably best to setup a virtual environment and activate it.[^1] Then run
 
     pip install -r requirements.txt
 
-[^1]: On macOS, install Miniforge. Run `conda create -n SomeName python=3.9` and
-`conda activate SomeName`. Then, execute `conda install pycairo` before running the
-`pip install` command.
+[^1]: On macOS, install Miniforge. Run `conda create -n SomeName python=3.10` and
+      `conda activate SomeName`. Then, execute `conda install pycairo` before
+      running the `pip install` command.
 
 
 ## Usage
 
 To analyze a recorded game, run `bin/analyze.py`. Example:
 
-    bin/analyze.py --log /path/to/gamecontroller-log /path/to/video
+    bin/analyze.py --log /path/to/gamecontroller-log /paths/to/videos
 
 When a video is opened for the first time, an extrinsic camera calibration is
-performed, which delays the start for a while.
+performed, which delays the start for a while. A half can consist of multiple
+videos. In that case, the filenames of the videos must be specified in
+chronological order. They will be processed as if they were a single video.
 
 If the app reaches the end of the video playback and is then closed (and not
 earlier), a statistics summary is written into the folder `statistics` using a
@@ -138,7 +140,7 @@ locale-aware version of the comma-separated values format.
   - `-h`, `--help`: Show the help message and exit.
 
 
-### Camera Calibration
+### <a name="cc"></a>Camera Calibration
 
 The camera calibration runs in three steps:
 
@@ -223,25 +225,22 @@ The app provided here is far from being finished. Therefore, there are a number 
 known issues, some of which are listed here:
 
   - The camera calibration depends on reasonable initial guesses for the camera pose
-    and the intrinsic camera parameters.
+    and the intrinsic camera parameters. With GoPro videos that contain telemetry,
+    this is limited to the camera's yaw angle and – to a lesser degree – its
+    position.
 
-  - The game recording solution developed by Berlin United only records games when
-    the game state is not `Initial`. As a result, timeouts are not recorded in the
-    videos. The app cannot handle situations, in which a timeout was taken after the
-    first `Ready` state, because such a half would be recorded as two videos and it
-    is assumed that videos always start with the first switch to `Ready`.
-
-  - The YOLOv5 network was trained with data from a few games at RoboCup 2019. Team
-    colors may appear differently under different lighting conditions. Therefore,
-    players might be associated with the wrong team or they are not detected at all.
-    In addition, the training set did not include the colors white and orange.
-    Therefore, the network cannot detect them. Also, the training set was not
-    balanced regarding upright and fallen robots. As a result, fallen robots tend to
-    have the wrong team color.
+  - The YOLOv5 network was trained with data from 17 games at RoboCup 2019 and 2023.
+    Team colors may appear differently under different lighting conditions.
+    Therefore, players might be associated with the wrong team or they are not
+    detected at all. Also, the training set was not balanced regarding upright and
+    fallen robots. As a result, fallen robots tend to have the wrong team color.
 
   - The world model is very rudimentary, i.e. not much is known about objects that
     are currently not visible. This in particular affects the computation of the
     ball possession and its visualization.
+
+  - Penalized robots can negatively impact the localization statistics if they are
+    still visible in the video in a position where they are not expected.
 
   - The fall detection is quite simple. It fails if YOLOv5's bounding box does not
     contain the whole robot. This often happens if a robot is partially hidden by
@@ -267,3 +266,5 @@ known issues, some of which are listed here:
     Studienarbeit. Humboldt-Universität zu Berlin.
 
  3. Aditya M. Deshpande (2021). [Multi-object trackers in Python](https://adipandas.github.io/multi-object-tracker/).
+
+ ---

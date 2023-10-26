@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 import torch
 from yolov5.models.common import DetectMultiBackend
-from yolov5.utils.general import check_img_size, non_max_suppression, scale_coords
+from yolov5.utils.general import check_img_size, non_max_suppression, scale_boxes
 from yolov5.utils.torch_utils import select_device
 
 
@@ -52,7 +52,9 @@ class Detector:
 
         with torch.no_grad():
             self._device: torch.device = select_device(device)
-            self.model = DetectMultiBackend(weights, device=self._device, dnn=dnn, data=data, fp16=half)
+            self.model = DetectMultiBackend(
+                weights, device=self._device, dnn=dnn, data=data, fp16=half  # type: ignore[arg-type]
+            )
             self.imgsz: list[int] = check_img_size(imgsz, s=self.model.stride)  # pyright: ignore
             assert isinstance(self.imgsz, list)
 
@@ -96,6 +98,6 @@ class Detector:
 
             if original_shape is not None and len(det):
                 # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_coords(image.shape[2:], det[:, :4], original_shape).round()
+                det[:, :4] = scale_boxes(image.shape[2:], det[:, :4], original_shape).round()
 
         return det.cpu().numpy()

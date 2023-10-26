@@ -10,6 +10,8 @@ import click
 import cv2
 import numpy as np
 import numpy.typing as npt
+import torch
+import torch.backends.mps
 from click._termui_impl import ProgressBar
 from torch.backends import cudnn
 from yolov5.utils.plots import Annotator
@@ -70,11 +72,18 @@ class VideoAnalysis:
             if "2nd" in filename or "half2" in filename:
                 half = 2
 
+        device = self._settings["detector"]["device"]
+        if device == "":
+            if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                device = "0"
+            elif torch.backends.mps.is_available():
+                device = "mps"
+
         # Load model
         self._detector = Detector(
             weights,
             imgsz=[1088, 1920],
-            device=self._settings["detector"]["device"],
+            device=device,
             dnn=self._settings["detector"]["dnn"],
             half=self._settings["detector"]["half"],
             conf_thres=self._settings["detector"]["conf_thres"],
@@ -91,7 +100,7 @@ class VideoAnalysis:
         if self._dataset.webcam:
             cudnn.benchmark = True  # set True to speed up constant image size inference
 
-        self._world_model = WorldModel(Camera(self._dataset.fps, self._settings), log, half == 2, field)
+        self._world_model = WorldModel(Camera(self._dataset.fps, self._settings), log, half == 2, field, self._settings)
         self._world_model.camera.calibrate(
             video,
             imgsz,
@@ -158,6 +167,10 @@ class VideoAnalysis:
             # Only save statistics if video was played back completely
             self._statistics.save(self._world_model.game_state.basename)
 
+        # Save window state in settings
+        if self._ui is not None:
+            self._ui.save_state()
+
         # Write settings back to file
         with self._settings_path.open("w", encoding="UTF-8", newline="\n") as file:
             json.dump(self._settings, file, indent=4)
@@ -214,7 +227,7 @@ class VideoAnalysis:
                     label = ""
                     if self._settings["view"]["labels"]:
                         label = f"id{player.id_} {player.color.name}"
-                    annotator.box_label(player.last_bb_in_image, label, color=player.color_triple(bgr=True))
+                    annotator.box_label(player.last_bb_in_image, label, color=player.color.as_color_triple(bgr=True))
                 if self._world_model.ball.last_seen == self._world_model.timestamp:
                     label = ""
                     if self._settings["view"]["labels"]:
@@ -236,9 +249,9 @@ class VideoAnalysis:
         overlay_gray = cv2.cvtColor(overlay, cv2.COLOR_BGR2GRAY)
         _, overlay_mask = cv2.threshold(overlay_gray, 1, 255, cv2.THRESH_BINARY)
         overlay_mask = cv2.bitwise_not(overlay_mask)
-        image = cv2.bitwise_and(image, image, mask=overlay_mask)
-        image = cv2.add(image, overlay)
-        self._ui.set_image("video", image)
+        masked_image = cv2.bitwise_and(image, image, mask=overlay_mask)
+        overlaid_image = cv2.add(masked_image, overlay)
+        self._ui.set_image("video", overlaid_image)
 
     def _draw_field(self) -> None:
         """Draw the field or heat map."""
@@ -257,7 +270,13 @@ class VideoAnalysis:
             self._world_model.field.field_length * 0.5 + self._world_model.field.border_strip_width,
             self._world_model.field.field_width * 0.5 + self._world_model.field.border_strip_width,
         )
-        ctx.scale(1, -1)  # TODO: flipping y is necessary but breaks font drawings (because they are flipped as well)
+        ctx.scale(1, -1)
+
+        # fix fonts, note that settings font size later on resets the font matrix and leads to broken behavior
+        fm = ctx.get_font_matrix()
+        fm.scale(0.02, -0.02)
+        ctx.set_font_matrix(fm)
+
         self._world_model.draw_on_field(ctx)
         self._statistics.draw_on_field(ctx)
 

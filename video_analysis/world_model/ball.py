@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cairo
 import cv2
@@ -20,15 +20,14 @@ class Ball:
     Therefore, if the ball is not seen, its position simply stays the same.
     """
 
-    _max_velocity = 2  # m/s
-    """The assumed maximum speed of the ball."""
-
-    def __init__(self, world_model: WorldModel) -> None:
+    def __init__(self, world_model: WorldModel, settings: dict[str, Any]) -> None:
         """Initialize the ball model.
 
         :param world_model: The world model.
+        :param settings: The settings used to model the ball.
         """
         self._world_model = world_model
+        self._max_velocity: float = settings["world_model"]["max_ball_velocity"]
         self.position: npt.NDArray[np.float_] = np.array([0, 0], dtype=np.float32)
         self.last_seen: float = -1.0
         self.last_bb_in_image: npt.NDArray[np.float_] = np.array([0, 0, 0, 0], dtype=np.float32)

@@ -11,6 +11,7 @@ from ..world_model import WorldModel
 from ..world_model.players import Player
 
 if TYPE_CHECKING:
+    from .ball_movement_time import BallMovementTime
     from .distance_counter import DistanceCounter
 
 
@@ -20,7 +21,13 @@ class Possession:
     NONE = 2
     """The state if no team is in possession of the ball."""
 
-    def __init__(self, world_model: WorldModel, distance_counter: DistanceCounter, categories: dict[str, list]) -> None:
+    def __init__(
+        self,
+        world_model: WorldModel,
+        distance_counter: DistanceCounter,
+        ball_movement_time: BallMovementTime,
+        categories: dict[str, list],
+    ) -> None:
         """Initialize the provider to track ball possession.
 
         :param world_model: The world model.
@@ -34,6 +41,9 @@ class Possession:
         self._categories: dict[str, list] = categories
         self._categories.update({"Ball Possession": [0, 0, " s"]})
         self._distance_counter: DistanceCounter = distance_counter
+
+        # This call will register `ball_movement_time`'s category.
+        ball_movement_time.set_possession(self)
 
         # This call will register `distance_counter`'s categories.
         distance_counter.set_possession(self)
@@ -56,6 +66,7 @@ class Possession:
                 if not self._ball_stopped:
                     self._time_when_ball_stopped = self._timestamp - self._distance_counter.time_ball_stopped
                     self._ball_stopped = True
+                    self._player_in_ball_possession = None
             else:
                 self._ball_stopped = False
                 self._time_when_ball_stopped = self._timestamp
@@ -93,11 +104,12 @@ class Possession:
                 self.state = 0 if distances[0] < distances[1] else 1
         elif distances[self.state] > 0.6 and time_since_ball_stopped > 0.6 and distances[1 - self.state] < 0.4:
             self.state = 1 - self.state
+            self._player_in_ball_possession = None
         elif distances[self.state] > 0.6 and time_since_ball_stopped > 1:
             self.state = self.NONE
 
         # Update closest player for drawing methods.
-        if self.state < 2 and time_since_ball_stopped > 0.6:
+        if self.state < 2 and time_since_ball_stopped > 0.6 and distances[self.state] < 0.4:
             self._player_in_ball_possession = closest_players[self.state]
         elif self.state == self.NONE:
             self._player_in_ball_possession = None
@@ -147,6 +159,7 @@ class Possession:
         """
         if (
             self._player_in_ball_possession is not None
+            and self._player_in_ball_possession in self._world_model.players
             and self._world_model.ball.last_seen == self._world_model.timestamp
         ):
             player_in_image = self._world_model.camera.world2image(self._player_in_ball_possession.position)

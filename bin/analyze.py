@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
-import platform
 import sys
+from os import unlink
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import click
 
@@ -18,7 +19,7 @@ from video_analysis import VideoAnalysis  # noqa: E402
 
 @click.command(context_settings=dict(help_option_names=["-h", "--help"]))
 @click.version_option(version="1.0.0")
-@click.argument("video", type=str)
+@click.argument("videos", nargs=-1, required=True, type=str)
 @click.option(
     "-l",
     "--log",
@@ -46,7 +47,7 @@ from video_analysis import VideoAnalysis  # noqa: E402
 @click.option("-f", "--force", is_flag=True, help="Force new camera calibration.")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output during camera calibration.")
 def cli(
-    video: str,
+    videos: list[str],
     log: Path,
     field: Path | None,
     half: int,
@@ -58,12 +59,23 @@ def cli(
 ) -> None:
     """Start the video analysis tool.
 
-    VIDEO - The video file path or URL.
+    VIDEOS - The video file paths or URLs.
     """
-    # Check whether the video exists if it is not an URL.
-    is_url: bool = video.lower().startswith(("rtsp://", "rtmp://", "http://", "https://"))
-    if not is_url and not Path(video).is_file():
-        raise click.BadParameter(f"File '{video}' does not exist.", param_hint="'VIDEO'")
+    # Check whether videos exist if they are not URLs.
+    for video in videos:
+        is_url: bool = video.lower().startswith(("rtsp://", "rtmp://", "http://", "https://"))
+        if not is_url and not Path(video).is_file():
+            raise click.BadParameter(f"File '{video}' does not exist.", param_hint="'VIDEOS'")
+
+    temp = None
+    if len(videos) == 1:
+        video = videos[0]
+    else:
+        temp = NamedTemporaryFile(prefix=Path(videos[0]).stem, suffix=".txt", delete=False)
+        for video in videos:
+            temp.write((str(Path(video).resolve()) + "\n").encode("utf-8"))
+        temp.close()
+        video = temp.name
 
     analysis = VideoAnalysis(
         video=video,
@@ -74,10 +86,12 @@ def cli(
         calibration=calibration,
         force=force,
         verbose=verbose,
-        weights=ROOT / "weights" / ("best.mlmodel" if platform.system() == "Darwin" else "best.pt"),
+        weights=ROOT / "weights/best.pt",
         headless=headless,
     )
     analysis.run()
+    if temp is not None:
+        unlink(temp.name)
 
 
 if __name__ == "__main__":

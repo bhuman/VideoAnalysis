@@ -51,7 +51,7 @@ class DistanceCounter:
         self._possession = possession
         self._categories.update(
             {
-                "Ball Moved": [0, 0, " m", "  Ball Moved"],
+                "Distance Ball Moved": [0, 0, " m", "  Distance Moved"],
                 "Distance Walked": [0, 0, " m"],
             }
         )
@@ -95,5 +95,5 @@ class DistanceCounter:
 
         # Update statistics categories.
         for team in range(2):
-            self._categories["Ball Moved"][team] = round(self._ball_distances[team], 1)
+            self._categories["Distance Ball Moved"][team] = round(self._ball_distances[team], 1)
             self._categories["Distance Walked"][team] = round(self._player_distances[team], 1)

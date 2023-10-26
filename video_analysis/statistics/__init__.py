@@ -13,11 +13,13 @@ from matplotlib import cm
 
 from ..world_model import WorldModel
 from .ball_isolation_time import BallIsolationTime
+from .ball_movement_time import BallMovementTime
 from .controlled_areas import ControlledAreas
 from .distance_counter import DistanceCounter
 from .falls import Falls
 from .gc_stats import GCStats
 from .goal_distance import GoalDistance
+from .localization import Localization
 from .possession import Possession
 
 ROOT = Path(__file__).resolve().parents[2]  # 2 folder up.
@@ -51,10 +53,18 @@ class Statistics:
             GCStats(world_model, self.categories),
             Falls(world_model, self.categories),
             distance_counter := DistanceCounter(world_model, self.categories),
-            possession := Possession(world_model, distance_counter, self.categories),
+            ball_movement_time := BallMovementTime(world_model, distance_counter, self.categories),
+            possession := Possession(world_model, distance_counter, ball_movement_time, self.categories),
             GoalDistance(world_model, self.categories),
             controlled_areas := ControlledAreas(world_model, self.categories),
         ]
+        if self._world_model.game_state.has_player_data:
+            localization: Localization | None = Localization(world_model, self.categories, settings)
+            self._providers.append(localization)
+            self._localization = localization
+            controlled_areas.localization = localization
+        else:
+            self._localization = None
         self._possession: Possession = possession
         self._controlled_areas: ControlledAreas = controlled_areas
         self._heatmap: npt.NDArray[np.float_] = np.zeros((740, 1040))
@@ -73,7 +83,7 @@ class Statistics:
             self._heatmap[y_idx][x_idx] += 1
 
     def get_heatmap(self) -> npt.NDArray[np.uint8]:
-        """Return the visual respresentation of the ball heat map.
+        """Return the visual representation of the ball heat map.
 
         :return: The heat map as bitmap.
         """
@@ -83,7 +93,7 @@ class Statistics:
 
         # Normalize it.
         if (np.max(heatmap)) != 0.0:
-            heatmap = (heatmap - np.min(heatmap)) / (np.max(heatmap) - np.min(heatmap))
+            heatmap = (heatmap - np.min(heatmap)) / (np.max(heatmap) - np.min(heatmap))  # type: ignore[operator]
 
         # Set color map.
         heatmap = np.array(cm.jet_r(heatmap, bytes=True))  # pyright: ignore # Undocumented function
@@ -131,6 +141,9 @@ class Statistics:
         self._possession.draw_on_field(context)
         if self._settings["view"]["controlled_areas"]:
             self._controlled_areas.draw_on_field(context)
+        # FIXME
+        if self._localization is not None:
+            self._localization.draw_on_field(context)
 
     def draw_on_image(self, image: npt.NDArray[np.uint8]) -> None:
         """Draw visualization of some statistics to the image.
@@ -138,5 +151,7 @@ class Statistics:
         :param image: The image to draw onto.
         """
         self._possession.draw_on_image(image)
+        if self._localization is not None:
+            self._localization.draw_on_image(image)
         if self._settings["view"]["controlled_areas"]:
             self._controlled_areas.draw_on_image(image)

@@ -12,6 +12,7 @@ from shapely.geometry import Polygon
 
 from ..world_model import WorldModel
 from ..world_model.players import Player
+from .localization import Localization
 
 
 class ControlledAreas:
@@ -53,16 +54,20 @@ class ControlledAreas:
         self._positions: list[np.ndarray] = []
         self._colors: list[Player.Color] = []
         self._color_triples: list[tuple[float, ...]] = []
+        self.localization: Localization | None = None
 
     def update(self) -> None:
         """Update the controlled areas category."""
         self._positions = []
         self._colors = []
         self._color_triples = []
-        for player in self._world_model.players:  # Iterate through players
+        players: list[Player] = self._world_model.players.players
+        if self.localization is not None:
+            players = self.localization.filter_players(players)
+        for player in players:  # Iterate through players
             self._positions.append(player.position)
             self._colors.append(player.color)
-            self._color_triples.append(player.color_triple(range01=True))
+            self._color_triples.append(player.color.as_color_triple(range01=True))
 
         self._regions = None
         if self._world_model.game_state.state == self._world_model.game_state.State.PLAYING:
@@ -93,6 +98,10 @@ class ControlledAreas:
             assert self._vertices is not None
             return self._regions, self._vertices
 
+        # FIXME the following should prevent a crash
+        # maybe there is a better solution such as returning the last regions
+        if len(self._positions) == 0:
+            return [], np.array([], dtype=np.float_)
         # Compute Voronoi diagram. It can fail (e.g. too few points, all on a line, etc.).
         try:
             vor = Voronoi(self._positions)

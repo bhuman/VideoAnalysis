@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from ..world_model import WorldModel
 
@@ -38,8 +38,8 @@ class GCStats:
 
     def update(self) -> None:
         """Update the game state statistics."""
-        if self._world_model.game_state.changed:
-            self._handle_new_event(self._world_model.game_state.current_event)
+        while len(self._world_model.game_state.current_actions) > 0:
+            self._handle_new_event(self._world_model.game_state.current_actions.pop(0))
 
         for team in range(2):
             self._categories["Goals per Minute"][team] = round(
@@ -47,52 +47,69 @@ class GCStats:
                 2,
             )
 
-    def _handle_new_event(self, event: str) -> None:
+    def _handle_new_event(self, event: dict[str, Any]) -> None:
         """Handle a new game state event.
 
         :param event: The game state event as read from the GameController log.
         """
         category: str | None = None
-        team: Literal[0, 1] = 0 if self._world_model.game_state.teams[0].color in event else 1
 
-        if "Illegal Positioning" in event or "Illegal Defender" in event:
-            category = "Illegal Position"
-        elif "Leaving the Field" in event:
-            category = "Leaving the Field"
-        elif "Illegal Motion in Set" in event:
-            category = "Illegal Motion in Set"
-        elif "Corner Kick for" in event:
-            category = "Corner Kick"
-        elif "Goal for" in event:
-            category = "Goal for"
-        elif "Player Pushing" in event:
-            category = "Player Pushing"
-        elif "Inactive Player" in event:
-            category = "Inactive Player"
-        elif "Illegal Ball Contact" in event:
-            category = "Illegal Ball Contact"
-        elif "Request for PickUp" in event:
-            category = "Request for PickUp"
-        elif "Pushing Free Kick for" in event:
-            category = "Pushing Free Kick"
-        elif "Goal Free Kick for" in event or "Goal Kick for" in event:
-            category = "Goal Kick"
-        elif "Kick In for" in event:
-            category = "Kick In"
-        elif "Corner Kick for" in event:
-            category = "Corner Kick"
+        if event["source"] == "user":
+            current_action = event["action"]
+            args = current_action["args"]
 
-        if category is not None:
-            # Increase counter of category if found.
-            self._categories[category][team] += 1
+            if "penalize" in current_action["type"] and "unpenalize" not in current_action["type"]:
+                team: Literal[0, 1] = 0 if self._world_model.game_state.teams[0].side in args["side"] else 1
+                if "illegalPosition" in args["call"]:
+                    category = "Illegal Position"
+                elif "illegalPositionInSet" in args["call"]:
+                    category = "Illegal Position"
+                elif "leavingTheField" in args["call"]:
+                    category = "Leaving the Field"
+                elif "motionInSet" in args["call"]:
+                    category = "Illegal Motion in Set"
+                elif "pushing" in args["call"]:
+                    category = "Player Pushing"
+                elif "fallenInactive" in args["call"]:
+                    category = "Inactive Player"
+                elif "foul" in args["call"]:
+                    category = "Pushing Free Kick"
+                elif "requestForPickUp" in args["call"]:
+                    category = "Request for PickUp"
+                elif "penaltyKick" in args["call"]:
+                    category = "Penalty Kick"
+                elif "foul" in args["call"]:
+                    category = "Pushing Free Kick"
+                else:
+                    return
+            elif "startSetPlay" in current_action["type"]:
+                team = 0 if self._world_model.game_state.teams[0].side in args["side"] else 1
+                if "cornerKick" in args["setPlay"]:
+                    category = "Corner Kick"
+                elif "goalKick" in args["setPlay"]:
+                    category = "Goal Kick"
+                elif "kickIn" in args["setPlay"]:
+                    category = "Kick In"
+                else:
+                    return
+            elif "goal" in current_action["type"]:
+                team = 0 if self._world_model.game_state.teams[0].side in args["side"] else 1
+                category = "Goal for"
+            else:
+                return
+        else:
+            return
 
-            # Update the overall counter of penalties.
-            if category in (
-                "Illegal Ball Contact",
-                "Player Pushing",
-                "Illegal Motion in Set",
-                "Inactive Player",
-                "Illegal Position",
-                "Leaving the Field",
-            ):
-                self._categories["Penalties"][team] += 1
+        # Increase counter of category if found.
+        self._categories[category][team] += 1
+
+        # Update the overall counter of penalties.
+        if category in (
+            "Illegal Ball Contact",
+            "Player Pushing",
+            "Illegal Motion in Set",
+            "Inactive Player",
+            "Illegal Position",
+            "Leaving the Field",
+        ):
+            self._categories["Penalties"][team] += 1

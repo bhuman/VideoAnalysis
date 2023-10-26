@@ -4,6 +4,7 @@ It contains everything needed to calculate an aerial view of the game that has b
 """
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from matplotlib import pyplot as plt
 from scipy import optimize
 from scipy.spatial import cKDTree as KDTree
 from scipy.spatial.transform import Rotation as R
+from telemetry_parser import Parser as GPMFParser  # type: ignore[attr-defined]
 
 from .sources import SourceAdapter
 from .world_model.field import Field
@@ -247,7 +249,11 @@ class Camera:
 
         points_original = self._detect_lines(self.background)
         try:
-            points_reduced, points_transformed = self._align_camera(field, points_original)
+            points_reduced, points_transformed, points_transformed_initial = self._align_camera(
+                source,
+                field,
+                points_original,
+            )
             assert self.intrinsics is not None
             assert self._extrinsics is not None
 
@@ -277,20 +283,21 @@ class Camera:
                 ax2.plot(points_reduced[:, 0], self.background.shape[0] - points_reduced[:, 1], ".")
                 ax2.set_title("reduced line points")
                 plt.savefig(path / "before.png")
-                _, (ax3) = plt.subplots(1, 1)
+                _, (ax3, ax4) = plt.subplots(2, 1)
                 ax3.set_aspect("equal")
                 ax3.plot(points_transformed[:, 0], points_transformed[:, 1], ".")
                 ax3.set_title("final projection")
+                ax4.set_aspect("equal")
+                ax4.plot(points_transformed_initial[:, 0], points_transformed_initial[:, 1], ".")
+                ax4.set_title("Initial transformation")
                 plt.savefig(path / "after.png")
                 logger.setLevel(log_level)
             logger.info("Calibration finished.")
 
         except RuntimeError:
             logger.error("Calibration failed. Using default values.")
-            self._extrinsics = Extrinsics.from_vector(
-                self._settings["calibration"]["initial_camera_pose"]["rotation"]
-                + self._settings["calibration"]["initial_camera_pose"]["translation"]
-            )
+            self._extrinsics = Extrinsics.from_dict(self._settings["calibration"]["initial_extrinsics"])
+            self.intrinsics = Intrinsics.from_dict(self._settings["calibration"]["initial_intrinsics"])
 
     def image2world(self, points_in_image: npt.NDArray[np.float_], z: float = 0.0) -> npt.NDArray[np.float_]:
         """Transforms points from the image into the world.
@@ -440,7 +447,7 @@ class Camera:
         """Transforms points from a 16:9 image using superview to points in a 4:3 image.
 
         :param points_in_center: Superview pixel coordinates relative to the image center.
-        :param optical_center: The center of the original image.
+        :param center: The center of the original image.
         :return: Regular pixel coordinates relative to the image center.
         """
         o = np.array([5.0 / 4.0, 5.0 / 4.0])
@@ -460,7 +467,7 @@ class Camera:
         """Transforms points from a 4:3 image to points in a 16:9 image using superview.
 
         :param points_in_center: Regular pixel coordinates relative to the image center.
-        :param optical_center: The center of the original image.
+        :param center: The center of the original image.
         :return: Superview pixel coordinates relative to the image center.
         """
         o = np.array([5.0 / 4.0, 5.0 / 4.0])
@@ -803,7 +810,7 @@ class Camera:
             c_idx, _ = Camera._find_closest_points(model_as_tree, t_points)
             model_selection = model[c_idx]
 
-            # Solve the problem, but don't optimize superview and resoluton (i.e. the last 3 elements)
+            # Solve the problem, but don't optimize superview and resolution (i.e. the last 3 elements)
             result = optimize.minimize(
                 lambda x: Camera._error_mean_square(model_selection, points, x, t[-3:]),
                 t[:-3],
@@ -822,11 +829,13 @@ class Camera:
 
     def _align_camera(
         self,
+        source: str,
         field: Field,
         points: npt.NDArray[np.float_],
-    ) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
+    ) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_], npt.NDArray[np.float_]]:
         """Find and set the intrinsic and extrinsic camera calibration.
 
+        :param source: Path of the video.
         :param field: The field model.
         :param points: A list of points on field lines found in the image.
         :return: The image points that are close enough to model points and the image points transformed to world
@@ -839,7 +848,7 @@ class Camera:
 
         # initial guess for camera calibration
         t0 = np.array(
-            self._settings["calibration"]["initial_extrinsics"]["rotation"]
+            self._get_initial_rotation_guess(source)
             + self._settings["calibration"]["initial_extrinsics"]["translation"]
             + self._settings["calibration"]["initial_intrinsics"]["optical_center"]
             + self._settings["calibration"]["initial_intrinsics"]["focal_length"]
@@ -871,4 +880,53 @@ class Camera:
         assert self.intrinsics is not None
         assert self._extrinsics is not None
         points_in_camera = self._image2camera(points, self.intrinsics)
-        return points, self._camera2world(points_in_camera, self._extrinsics)
+        return points, self._camera2world(points_in_camera, self._extrinsics), t_points
+
+    def _get_initial_rotation_guess(self, source: str | Path) -> list[float]:
+        """Get an initial guess for the rotation of the camera, either directly from configuration or augmented by GPMF
+        telemetry data embedded into the video file.
+
+        :param source: Path of the video.
+        :return: An initial guess for the rotation of the camera as list of xyz-Euler angles in degrees.
+        """
+        if isinstance(source, str):
+            source = Path(source)
+        try:
+            n = 10
+            if source.suffix == ".txt":
+                with source.open() as f:
+                    video: str = f.readline()[:-1]
+            else:
+                video = str(source)
+            telemetry = GPMFParser(video).telemetry()
+            gravity_vector = list(
+                itertools.islice(
+                    (
+                        [item["x"], item["y"], item["z"]]
+                        for data in telemetry
+                        if "GravityVector" in data
+                        for item in data["GravityVector"]["Data"]
+                    ),
+                    n,
+                )
+            )
+            if len(gravity_vector) == n:
+                grav = np.array(gravity_vector, dtype=np.float32)[-1]
+                gopro2camera = R.from_matrix([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
+                camera2world_guessed = R.from_euler(
+                    "z", self._settings["calibration"]["initial_extrinsics"]["rotation"][2], degrees=True
+                )
+
+                reference_grav = [0, 1, 0]
+                orth_a = np.cross(grav, reference_grav)
+                angle = np.arccos((grav @ reference_grav) / np.linalg.norm(grav))
+                gp_rot_measured = R.from_rotvec(orth_a / np.linalg.norm(orth_a) * angle)
+
+                r = camera2world_guessed * gopro2camera * gp_rot_measured * gopro2camera.inv()
+
+                return r.as_euler("xyz", degrees=True).tolist()
+        except OSError:
+            # video file does not contain a metadata stream
+            pass
+
+        return self._settings["calibration"]["initial_extrinsics"]["rotation"]

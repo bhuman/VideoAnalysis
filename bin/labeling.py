@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import logging
+import re
+import shutil
+import zipfile
+from itertools import count, repeat
+from pathlib import Path
+from typing import Any
+
+import cv2
+import torch
+import tqdm
+import yaml
+from yolov5.utils.dataloaders import LoadImages
+
+from video_analysis.detection import Detector
+
+from .csv2yolov5 import CLASSES as CSV_CLASSES
+
+# of these, use every 'TEST_RATIO' as test images
+TEST_RATIO = 10
+
+# or use every 'VAL_RATIO' as validation images, the others for training.
+VAL_RATIO = 5
+
+ROOT = Path(__file__).parent.parent
+DATA_PATH = ROOT / "data"
+EXTRACT_PATH = DATA_PATH / "video_frames"
+PRELABELED_PATH = DATA_PATH / "pre-labeled"
+LABELED_PATH = DATA_PATH / "labeled"
+
+CLASSES = ["ball", "blue", "red", "yellow", "black", "white", "green", "orange", "purple", "brown", "gray"]
+
+
+logger = logging.getLogger(__name__)
+
+
+def _yolov1_to_yolov5(dataset_path: Path) -> None:
+    out_dataset_path = LABELED_PATH / dataset_path.name
+    imgs_path = out_dataset_path / "images"
+    labels_path = out_dataset_path / "labels"
+
+    train_images_path: Path = imgs_path / "train"
+    val_images_path: Path = imgs_path / "val"
+    test_images_path: Path = imgs_path / "test"
+    train_labels_path: Path = labels_path / "train"
+    val_labels_path: Path = labels_path / "val"
+    test_labels_path: Path = labels_path / "test"
+
+    train_images_path.mkdir(parents=True)
+    val_images_path.mkdir(parents=True)
+    test_images_path.mkdir(parents=True)
+    train_labels_path.mkdir(parents=True)
+    val_labels_path.mkdir(parents=True)
+    test_labels_path.mkdir(parents=True)
+
+    meta_path = dataset_path / "obj.data"
+
+    with meta_path.open() as f:
+        meta_matcher = re.compile(r"^(?P<key>.*?)\s?=\s?(?P<value>.*?)$")
+        meta: dict[str, str] = {}
+        for line in f.readlines():
+            match = meta_matcher.match(line)
+            if match is not None:
+                meta[match["key"]] = match["value"]
+
+    classes_path = dataset_path / meta.pop("names")
+    dataset_classes: list[str] = []
+    with classes_path.open() as f:
+        for class_name in f:
+            dataset_classes.append(class_name.strip())
+
+    del meta["classes"]
+
+    sample_count = 0
+
+    for subset_index_filename in meta.values():
+        subset_index_path = dataset_path / subset_index_filename
+        with subset_index_path.open() as f:
+            img_filenames = [img_filename.strip() for img_filename in f]
+        for img_path, label_path in (
+            (dataset_path / img_filename, (dataset_path / img_filename).with_suffix(".txt"))
+            for img_filename in img_filenames
+        ):
+            subset = "test" if sample_count % TEST_RATIO == 0 else "val" if sample_count % VAL_RATIO == 1 else "train"
+            with label_path.open() as f:
+                labels = f.readlines()
+
+            mapped_labels: list[str] = []
+            for label in labels:
+                class_idx, x_center, y_center, width, height = label.strip().split(" ")
+                class_idx = str(CLASSES.index(dataset_classes[int(class_idx)]))
+                mapped_labels.append(" ".join([class_idx, x_center, y_center, width, height]))
+            (labels_path / subset / label_path.name).write_text("\n".join(mapped_labels))
+
+            shutil.copyfile(img_path, imgs_path / subset / img_path.name)
+            sample_count += 1
+
+    meta_path = out_dataset_path / f"{dataset_path.name}.yaml"
+    with meta_path.open("w", encoding="UTF-8", newline="\n") as f:
+        content = {
+            "path": out_dataset_path.resolve().as_posix(),
+            "train": train_images_path.relative_to(out_dataset_path).as_posix(),
+            "val": val_images_path.relative_to(out_dataset_path).as_posix(),
+            "test": test_images_path.relative_to(out_dataset_path).as_posix(),
+            "nc": len(CLASSES),
+            "names": CLASSES,
+        }
+        yaml.safe_dump(content, f, sort_keys=False)
+
+
+def _label(dataset_path: Path, model_weights: Path, dataset_name: str | None = None) -> Path | None:
+    if dataset_name is None:
+        dataset_name = dataset_path.stem
+
+    # Load settings from file
+    settings_path = ROOT / "config" / "settings.json"
+
+    with settings_path.open(encoding="UTF-8", newline="\n") as file:
+        settings: dict[str, Any] = json.load(file)  # noqa: F821
+
+    device = settings["detector"]["device"]
+    if device == "":
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            device = "0"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+
+    # Load model
+    detector = Detector(
+        model_weights,
+        imgsz=[1088, 1920],
+        device=device,
+        dnn=settings["detector"]["dnn"],
+        half=settings["detector"]["half"],
+        conf_thres=settings["detector"]["conf_thres"],
+        iou_thres=settings["detector"]["iou_thres"],
+        agnostic_nms=True,
+        max_det=settings["detector"]["max_det"],
+    )
+    imgsz = detector.imgsz
+    stride: int = detector.model.stride  # pyright: ignore # Typing issue.
+    pt: bool = detector.model.pt  # pyright: ignore # Typing issue.
+
+    # Load data again
+    dataset = LoadImages(dataset_path, img_size=imgsz, stride=stride, auto=pt)
+
+    out_dataset_path = PRELABELED_PATH / dataset_name
+    imgs_path = out_dataset_path / "imgs"
+
+    out_dataset_path.mkdir(parents=True)
+    imgs_path.mkdir()
+
+    imgs: list[Path] = []
+
+    for path_, preprocessed_image, original_image, _, _ in tqdm.tqdm(
+        dataset, desc=f"Labeling {dataset_path.relative_to(DATA_PATH)}", unit="image"
+    ):
+        img_path = Path(path_)
+        dest_img_path = imgs_path / img_path.with_suffix(".jpg").name
+        # Run object detector
+        detections = detector.run(preprocessed_image, original_image.shape)
+        # output format: xmin, ymin, xmax, ymax, confidence, class
+        lines = []
+        for det in detections:
+            xmin, ymin, xmax, ymax, _, class_idx = det
+            width = xmax - xmin
+            height = ymax - ymin
+            x_center = xmin + width / 2
+            y_center = ymin + height / 2
+            lines.append(
+                " ".join(
+                    map(
+                        str,
+                        [int(class_idx), x_center / imgsz[1], y_center / imgsz[0], width / imgsz[1], height / imgsz[0]],
+                    )
+                )
+            )
+        dest_img_path.with_suffix(".txt").write_text("\n".join(lines) + "\n", encoding="UTF-8")
+
+        shutil.copyfile(img_path, dest_img_path)
+        imgs.append(dest_img_path)
+
+    imgs_meta_path = out_dataset_path / f"{dataset_name}.txt"
+    with imgs_meta_path.open("w", encoding="UTF-8", newline="\n") as f:
+        f.writelines(img.relative_to(out_dataset_path).as_posix() + "\n" for img in imgs)
+
+    names_path = out_dataset_path / "obj.names"
+    with names_path.open("w", encoding="UTF-8", newline="\n") as f:
+        f.writelines("\n".join(CSV_CLASSES))
+    meta_path = out_dataset_path / "obj.data"
+    with meta_path.open("w", encoding="UTF-8", newline="\n") as f:
+        content = {
+            "classes": len(CSV_CLASSES),
+            "names": names_path.relative_to(out_dataset_path).as_posix(),
+            dataset_name: imgs_meta_path.relative_to(out_dataset_path).as_posix(),
+        }
+        f.writelines(f"{key} = {val}\n" for key, val in content.items())
+
+    zip_path = out_dataset_path.with_suffix(".zip")
+    with zipfile.ZipFile(zip_path, "w") as f:
+        for filepath in out_dataset_path.rglob("*"):
+            rel_filepath = filepath.relative_to(out_dataset_path.parent)
+            f.write(filename=filepath, arcname=rel_filepath.as_posix())
+    return out_dataset_path
+
+
+def _extract(path: Path, n_frames: int | None, stride: int, skip_first_n: int, tqdm_kwargs: dict = {}) -> Path | None:
+    vidcap = None
+    try:
+        vidcap = cv2.VideoCapture(str(path))
+        if not vidcap.isOpened():
+            return None
+        frame: int = 0
+        n_frames_: int = 0
+        success: bool = True
+        extract_path = EXTRACT_PATH / path.stem
+        with tqdm.tqdm(desc=f"Extracting {path.name}", total=n_frames, unit="frame", **tqdm_kwargs) as pbar:
+            for _ in range(skip_first_n):
+                vidcap.grab()
+                frame += 1
+            while success and (n_frames_ < n_frames if n_frames is not None else True):
+                for _ in range(stride):
+                    vidcap.grab()
+                    frame += 1
+                success, img = vidcap.read()
+                if success:
+                    img_path: Path = extract_path / f"{frame}.jpeg"
+                    if not img_path.exists():
+                        if not img_path.parent.exists():
+                            img_path.parent.mkdir(parents=True)
+                        cv2.imwrite(str(img_path), img)
+                    n_frames_ += 1
+                    pbar.update(1)
+                frame += 1
+        return extract_path
+    finally:
+        if vidcap is not None:
+            vidcap.release()
+
+
+if __name__ == "__main__":
+    import click
+    from tqdm.contrib.concurrent import process_map
+
+    @click.group()
+    def cli() -> None:
+        ...
+
+    @cli.command()
+    @click.argument(
+        "video_paths",
+        type=click.Path(exists=True, file_okay=True, dir_okay=True, readable=True, resolve_path=True, path_type=Path),
+        nargs=-1,
+    )
+    @click.option("-n", "-n-frames", "n_frames", type=click.IntRange(min=1), default=None)
+    @click.option("-s", "--stride", "stride", type=click.IntRange(min=0), default=0)
+    @click.option("--skip-first-n", "skip_first_n", type=click.IntRange(min=0), default=0)
+    def extract(video_paths: list[Path], n_frames: int | None, stride: int, skip_first_n: int) -> None:
+        paths: list[Path] = []
+        for video_path in video_paths:
+            if video_path.is_file():
+                paths.append(video_path)
+            elif video_path.is_dir():
+                paths.extend(video_path.glob("*.mp4"))
+            else:
+                raise ValueError
+            tqdm.tqdm
+        process_map(
+            _extract,
+            paths,
+            repeat(n_frames),
+            repeat(stride),
+            repeat(skip_first_n),
+            ({"position": position} for position in count(1)),
+            desc="Extracting video files",
+            unit="video",
+        )
+
+    @cli.command()
+    @click.option(
+        "-w",
+        "--weights",
+        "weights",
+        type=click.Path(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            writable=False,
+            readable=True,
+            resolve_path=True,
+            path_type=Path,
+        ),
+        default=ROOT / "weights" / "best.pt",
+    )
+    @click.argument(
+        "dataset_paths",
+        type=click.Path(
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            writable=False,
+            readable=True,
+            resolve_path=True,
+            path_type=Path,
+        ),
+        nargs=-1,
+    )
+    def label(dataset_paths: list[Path], weights: Path) -> None:
+        for dataset_path in tqdm.tqdm(dataset_paths):
+            _label(dataset_path=dataset_path, model_weights=weights)
+
+    @cli.command()
+    @click.argument(
+        "dataset_paths",
+        type=click.Path(
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            writable=False,
+            readable=True,
+            resolve_path=True,
+            path_type=Path,
+        ),
+        nargs=-1,
+    )
+    def yolov1_to_yolov5(dataset_paths: list[Path]) -> None:
+        for dataset_path in tqdm.tqdm(dataset_paths):
+            _yolov1_to_yolov5(dataset_path=dataset_path)
+
+    cli()

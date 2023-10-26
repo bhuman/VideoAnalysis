@@ -12,6 +12,5 @@ __pycache__
 /config/*Half.json
 /data
 /runs
-/src/multi-object-tracker
 /statistics
 /weights/yolov5n6.pt

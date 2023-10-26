@@ -4,17 +4,18 @@ import statistics
 from collections import deque
 from collections.abc import Iterator
 from enum import Enum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import cairo
 import cv2
 import motrackers
 import numpy as np
-import numpy.typing as npt
 
 from ..camera import Camera
 
 if TYPE_CHECKING:
+    import numpy.typing as npt
+
     from . import WorldModel
 
 
@@ -35,8 +36,47 @@ class Player:
         RED = 2
         YELLOW = 3
         BLACK = 4
-        GREEN = 5
-        GRAY = 6
+        WHITE = 5
+        GREEN = 6
+        ORANGE = 7
+        PURPLE = 8
+        BROWN = 9
+        GRAY = 10
+
+        @classmethod
+        def from_str(cls, color: str):
+            """The mapping from GameController color names to YOLOv5 color classes."""
+            try:
+                return cls[color.upper()]
+            except KeyError:
+                return cls.UNKNOWN
+
+        def as_color_triple(self, bgr: bool = False, range01: bool = False):
+            """Return the draw color that corresponds to the color that was most often
+            assigned to this player recently.
+
+            :param bgr: Return BGR instead of RGB.
+            :param range01: Color values are between 0 and 1 instead of 0 and 255.
+            :return: A tuple of three channel intensities.
+            """
+            color: tuple[int, int, int] | tuple[float, float, float] = [
+                (0, 0, 0),  # UNKNOWN
+                (0, 128, 255),  # BLUE
+                (255, 0, 0),  # RED
+                (255, 255, 0),  # YELLOW
+                (2, 2, 2),  # BLACK
+                (255, 255, 255),  # WHITE
+                (0, 255, 0),  # GREEN
+                (255, 128, 0),  # ORANGE
+                (128, 0, 128),  # PURPLE
+                (128, 64, 0),  # BROWN
+                (192, 192, 192),  # GRAY
+            ][self.value]
+            if bgr:
+                color = color[::-1]  # type: ignore[assignment]
+            if range01:
+                color = (color[0] / 255, color[1] / 255, color[2] / 255)
+            return color
 
     def __init__(
         self,
@@ -74,7 +114,7 @@ class Player:
         :param context: The context to draw to.
         """
         context.save()
-        context.set_source_rgb(*self.color_triple(range01=True))
+        context.set_source_rgb(*self.color.as_color_triple(range01=True))
         context.move_to(self.position[0], self.position[1])
         context.arc(self.position[0], self.position[1], 0.15, 0, 2 * np.pi)
         context.fill()
@@ -84,13 +124,13 @@ class Player:
         """Draw the player onto the image.
 
         :param image: The image to draw onto.
-        :param camera: Used to transform image coordinates to field coordinates.
+        :param camera: Used to transform field coordinates into image coordinates.
         """
         radius = 0.17 if self.upright else 0.34
         angles = np.linspace(0, 2 * np.pi, 16, endpoint=False)
         points_in_world = self.position + np.stack([np.cos(angles), np.sin(angles)], axis=-1) * radius
         points_in_image = camera.world2image(points_in_world)
-        color = self.color_triple(bgr=True)
+        color = self.color.as_color_triple(bgr=True)
         cv2.polylines(image, [points_in_image.astype(np.int32)], True, color, 3)
 
     @property
@@ -101,29 +141,6 @@ class Player:
         playing.
         """
         return Player.Color.UNKNOWN if len(self.colors) == 0 else statistics.mode(self.colors)
-
-    def color_triple(self, bgr: bool = False, range01: bool = False) -> tuple[int | float, ...]:
-        """Return the draw color that corresponds to the color that was most often
-        assigned to this player recently.
-
-        :param bgr: Return BGR instead of RGB.
-        :param range01: Color values are between 0 and 1 instead of 0 and 255.
-        :return: A tuple of three channel intensities.
-        """
-        color: tuple[int | float, ...] = [
-            (0, 0, 0),
-            (0, 128, 255),
-            (255, 0, 0),
-            (255, 255, 0),
-            (2, 2, 2),
-            (0, 255, 0),
-            (192, 192, 192),
-        ][self.color.value]
-        if bgr:
-            color = color[::-1]
-        if range01:
-            color = tuple(x / 255 for x in color)
-        return color
 
 
 class Players:
@@ -139,43 +156,49 @@ class Players:
     foot point back into the image is inside its bounding box.
     """
 
-    _player_lost_delay = 5  # 5 seconds
-    """The number of second after which an unseen player is finally dropped."""
-
-    _color_memory_duration = 20  # 20 seconds
-    """The number of seconds recent color assignments are remembered for each player."""
-
-    _border_tolerance = 3  # 3 pixels
-    """The minimum distance from the image border in which a fall detection is still applied."""
-
-    _upright_center_above_ground = 0.26
-    """The assumed height of the center of an upright player above ground."""
-
-    _fallen_center_above_ground = 0.08
-    """The assumed height of the center of a fallen player above ground."""
-
-    _names_to_colors: dict[str, Player.Color] = {
-        "Blue": Player.Color.BLUE,
-        "Red": Player.Color.RED,
-        "Yellow": Player.Color.YELLOW,
-        "Black": Player.Color.BLACK,
-        "Green": Player.Color.GREEN,
-        "Gray": Player.Color.GRAY,
-    }
-    """The mapping from GameController color names to YOLOv5 color classes."""
-
-    def __init__(self, world_model: WorldModel) -> None:
+    def __init__(self, world_model: WorldModel, settings: dict[str, Any]) -> None:
         """Initialize the players model.
 
         :param world_model: The world model.
+        :param settings: The settings used to model the players.
         """
         self._world_model = world_model
+        self._settings = settings
         self.players: list[Player] = []
         self._remembered_players: list[Player] = []
-        self._tracker = motrackers.CentroidTracker(max_lost=self._player_lost_delay * world_model.camera.fps)
+        self._tracker = motrackers.CentroidTracker(
+            max_lost=self._settings["world_model"]["player_lost_delay"] * world_model.camera.fps
+        )
         self._team_colors: list[Player.Color] = [
-            self.name_to_color(team.color) for team in world_model.game_state.teams
+            Player.Color.from_str(color)
+            for team in world_model.game_state.teams
+            for color in (team.field_player_color, team.goalkeeper_color)
         ]
+
+        # A matrix describing differences between prototypical color classes.
+        color_similarity = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 5, 5, 7, 7, 3, 6, 3, 4, 7],
+            [0, 5, 0, 2, 7, 7, 4, 1, 2, 3, 7],
+            [0, 5, 2, 0, 7, 7, 2, 1, 4, 1, 7],
+            [0, 7, 7, 7, 0, 6, 7, 7, 7, 7, 3],
+            [0, 7, 7, 7, 6, 0, 7, 7, 7, 7, 3],
+            [0, 3, 4, 2, 7, 7, 0, 3, 6, 1, 7],
+            [0, 6, 1, 1, 7, 7, 3, 0, 3, 2, 7],
+            [0, 3, 2, 4, 7, 7, 6, 3, 0, 5, 7],
+            [0, 4, 3, 1, 7, 7, 1, 2, 5, 0, 7],
+            [0, 7, 7, 7, 3, 3, 7, 7, 7, 7, 0],
+        ]
+
+        # Determine a mapping from all color classes to the ones present in the game.
+        self._matching_color: list[Player.Color] = [Player.Color.UNKNOWN]
+        for color in range(1, len(color_similarity)):
+            similarity = np.array([color_similarity[color][team_color.value] for team_color in self._team_colors])
+            indices = np.flatnonzero(similarity == similarity.min()).tolist()
+            if len(indices) == 1 or len(indices) == 2 and (indices[0] < 2) == (indices[1] < 2):
+                self._matching_color.append(self._team_colors[indices[0]])
+            else:
+                self._matching_color.append(Player.Color.UNKNOWN)
 
     def update(self, percepts: list[npt.NDArray[np.float_]]) -> None:
         """Update the players model.
@@ -192,6 +215,8 @@ class Players:
             tracker_scores.append(obj[4])
             tracker_ids.append(obj[5])
 
+        border_tolerance: float = self._settings["world_model"]["border_tolerance"]
+
         # TODO: We want to get rid of this tracker library asap.
         tracks: list[tuple[int | float, ...]] = self._tracker.update(tracker_boxes, tracker_scores, tracker_ids)
 
@@ -204,32 +229,43 @@ class Players:
                     and obj[2] - obj[0] == track[4]
                     and obj[3] - obj[1] == track[5]
                 ):
-                    mapped_color = Player.Color(int(obj[5]))
+                    mapped_color = self._matching_color[int(obj[5])]
                     position = self._world_model.camera.image2world(
-                        np.array([(obj[0] + obj[2]) * 0.5, (obj[1] + obj[3]) * 0.5]), self._upright_center_above_ground
+                        np.array([(obj[0] + obj[2]) * 0.5, (obj[1] + obj[3]) * 0.5]),
+                        self._settings["world_model"]["upright_center_above_ground"],
                     )
                     upright: bool = True
                     in_image = self._world_model.camera.world2image(position)
                     assert self._world_model.camera.intrinsics
                     if (
-                        obj[0] > self._border_tolerance
-                        and obj[2] < self._world_model.camera.intrinsics.resolution[0] - self._border_tolerance
-                        and obj[1] > self._border_tolerance
-                        and obj[3] < self._world_model.camera.intrinsics.resolution[1] - self._border_tolerance
-                        and in_image[0] <= obj[0]
-                        or in_image[0] >= obj[2]
-                        or in_image[1] <= obj[1]
-                        or in_image[1] >= obj[3]
+                        obj[0] > border_tolerance
+                        and obj[2] < self._world_model.camera.intrinsics.resolution[0] - border_tolerance
+                        and obj[1] > border_tolerance
+                        and obj[3] < self._world_model.camera.intrinsics.resolution[1] - border_tolerance
+                        and (
+                            in_image[0] <= obj[0]
+                            or in_image[0] >= obj[2]
+                            or in_image[1] <= obj[1]
+                            or in_image[1] >= obj[3]
+                        )
                     ):
                         position = self._world_model.camera.image2world(
                             np.array([(obj[0] + obj[2]) * 0.5, (obj[1] + obj[3]) * 0.5]),
-                            self._fallen_center_above_ground,
+                            self._settings["world_model"]["fallen_center_above_ground"],
                         )
                         upright = False
 
                     for player in self.players:
-                        if player.id_ == track[1]:
-                            if mapped_color in self._team_colors:
+                        if player.id_ == int(track[1]):
+                            age: float = self._world_model.timestamp - player.last_seen
+                            if (
+                                np.linalg.norm(player.position - position)
+                                > self._settings["world_model"]["player_position_tolerance"]
+                                + age * self._settings["world_model"]["player_max_speed"]
+                            ):
+                                player.last_seen = 0
+                                continue
+                            if mapped_color != Player.Color.UNKNOWN:
                                 player.colors.append(mapped_color)
                             player.position = position
                             player.last_seen = self._world_model.timestamp
@@ -245,7 +281,12 @@ class Players:
                                 last_seen=self._world_model.timestamp,
                                 last_bb_in_image=obj[:4],
                                 upright=upright,
-                                color_memory=int(1 + self._world_model.camera.fps * self._color_memory_duration + 0.99),
+                                color_memory=int(
+                                    1
+                                    + self._world_model.camera.fps
+                                    * self._settings["world_model"]["color_memory_duration"]
+                                    + 0.99
+                                ),
                             )
                         )
                     break
@@ -262,19 +303,11 @@ class Players:
             player
             for player in self.players
             if player.last_seen < self._world_model.timestamp
-            and self._world_model.timestamp - player.last_seen < self._player_lost_delay
+            and self._world_model.timestamp - player.last_seen < self._settings["world_model"]["player_lost_delay"]
         ]
 
         # However, the model only contains players that are currently seen.
         self.players = [player for player in self.players if player.last_seen == self._world_model.timestamp]
-
-    def name_to_color(self, name: str) -> Player.Color:
-        """Determine the color constant for a GameController color name.
-
-        :param name: The name of the color as used in GameController logs.
-        :return: The color constant that also matches the YOLOv5 detection class.
-        """
-        return self._names_to_colors.get(name, Player.Color.UNKNOWN)
 
     def color_to_team(self, color: Player.Color) -> Literal[0, 1]:
         """Determine the team index to which a color belongs.
@@ -283,7 +316,7 @@ class Players:
         :return: The index of the team. 0 plays on the left side of the video, 1
         on the right side.
         """
-        return 0 if color == self._team_colors[0] else 1
+        return 0 if color in self._team_colors[0:2] else 1
 
     def draw_on_field(self, context: cairo.Context) -> None:
         """Draw the players onto the field.
