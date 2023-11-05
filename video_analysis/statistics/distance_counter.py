@@ -78,16 +78,19 @@ class DistanceCounter:
                     self.time_ball_stopped += 1 / self._world_model.camera.fps
 
             for player in self._world_model.players:
-                if player.id_ not in self._players:
-                    self._players[player.id_] = player.position
+                if not player.upright:
+                    self._players.pop(player.id_, None)
+                else:
+                    if player.upright and player.id_ not in self._players:
+                        self._players[player.id_] = player.position
 
-                # Compute distance between last saved position and current position.
-                distance_player: float = np.linalg.norm(player.position - self._players[player.id_]).astype(float)
+                    # Compute distance between last saved position and current position.
+                    distance_player: float = np.linalg.norm(player.position - self._players[player.id_]).astype(float)
 
-                # Ignore noise in the detected movements.
-                if distance_player >= self._min_distance:
-                    self._players[player.id_] = player.position
-                    self._player_distances[self._world_model.players.color_to_team(player.color)] += distance_player
+                    # Ignore noise in the detected movements.
+                    if distance_player >= self._min_distance:
+                        self._players[player.id_] = player.position
+                        self._player_distances[self._world_model.players.color_to_team(player.color)] += distance_player
         else:
             # Forget everything when not in playing state.
             self._ball = None
