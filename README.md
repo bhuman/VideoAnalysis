@@ -229,6 +229,12 @@ known issues, some of which are listed here:
     this is limited to the camera's yaw angle and – to a lesser degree – its
     position.
 
+  - The camera calibration also depends on the detection of the field lines. If the
+    lines were painted, it is harder to find appropriate ranges in the color space
+    to segment them. If the field corners are missing in the video, the white goals
+    can impede the calibration result, because the calibration associates them with
+    the field line model and there is not enough goal line visible to counter this.
+
   - The YOLOv5 network was trained with data from 17 games at RoboCup 2019 and 2023.
     Team colors may appear differently under different lighting conditions.
     Therefore, players might be associated with the wrong team or they are not
