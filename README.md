@@ -5,7 +5,10 @@ seven teams labelled images from recordings of RoboCup 2019 soccer games. Each t
 labeled the ball and all players including their jersey colors and their jersey
 numbers in 5000 images. These 35000 labeled images could then be used by the teams
 to develop software that is helpful in automatically analyzing games based on video
-recordings. This is B-Human's contribution to this challenge.
+recordings. This app is based on B-Human's original contribution to this challenge.
+
+In 2023, the development has also been partially funded by the RoboCup Federation
+through the RCF Project Support 2023.
 
 ![](doc/app.jpg)
 *The application showing the video of a half not in the training set with the
@@ -20,9 +23,11 @@ video.*
 ### Object Detection
 
 A YOLOv5 [[1]](#ref) network was trained with an input resolution of 1920x1080 with
-bounding boxes of the ball and the players including their jersey colors. Only 682
-images were actually used at a 70/20/10 split. The inference takes ~39 ms per image
-on an Apple M1 Max processor.
+bounding boxes of the ball and the players including their jersey colors. Only 681
+images were used from the original dataset together with 999 other images we added
+in 2023. For training, we used a 70/20/10 split. [Here](doc/TRAINING.md) is
+described, how to train the network from scratch. The inference takes ~39 ms per
+image on an Apple M1 Max processor.
 
 ![](doc/confusion_matrix.png)
 *<div align="center">Confusion matrix of ball and player colors in the test set</div>*
@@ -202,21 +207,6 @@ like a bird's eye view of the field, i.e. with 90° angles in all the corners. T
 graph is basically a representation of how well the calibration worked. On the other
 hand, the verbose mode prints the calibration error for each iteration (in m) to
 the terminal.
-
-
-## Training the Network
-
-[Here](doc/TRAINING.md) is described, how to train the network from scratch.
-However, the actual network provided in `weights/best.pt` was trained a little
-differently. The data provided by the team SPQR was not completely ignored. Instead,
-a network was first trained as described, but then, a new csv file was created for
-SPQR's dataset by using the trained network to detect the objects and associating
-them with the classes provided in the original csv file. However, only the first 82%
-of the images were actually used, because the robots are rather crowded in the last
-images, resulting in some wrong bounding boxes provided by the network. To avoid
-training on wrong data, these images were skipped. Afterwards, the network was
-trained again, this time with the automatically annotated images from SPQR's
-dataset.
 
 
 ## Known Issues
