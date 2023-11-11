@@ -48,10 +48,16 @@ class Falls:
                     status.last_fallen = self._world_model.timestamp
 
                 # Update upright state and count falls.
-                if status.upright and self._world_model.timestamp - status.last_upright >= self._state_change_delay:
+                if (
+                    status.upright
+                    and status.last_upright != 0
+                    and self._world_model.timestamp - status.last_upright >= self._state_change_delay
+                ):
                     status.upright = False
                     self._categories["Falls"][self._world_model.players.color_to_team(player.color)] += 1
                 elif (
-                    not status.upright and self._world_model.timestamp - status.last_fallen >= self._state_change_delay
+                    not status.upright
+                    and status.last_fallen != 0
+                    and self._world_model.timestamp - status.last_fallen >= self._state_change_delay
                 ):
                     status.upright = True
