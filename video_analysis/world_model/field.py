@@ -92,6 +92,18 @@ class Field:
 
         self._lines_in_image: list[npt.NDArray[np.float_]] | None = None
 
+    def is_on_carpet(self, position: npt.NDArray[np.float_]) -> bool:
+        """Determine whether a position is on the carpet.
+
+        Only half of the border strip in considered to be part of the carpet.
+        :param position The position to check.
+        :return: Is the position on the field or the inner half of the border strip?
+        """
+        return (
+            abs(position[0]) <= (self.field_length + self.border_strip_width) * 0.5
+            and abs(position[1]) <= (self.field_width + self.border_strip_width) * 0.5
+        )
+
     def draw_on_field(self, context: cairo.Context) -> None:
         """Draw the field.
 

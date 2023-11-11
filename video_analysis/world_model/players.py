@@ -295,7 +295,11 @@ class Players:
 
         # Make all players without a valid color invisible.
         for player in self.players:
-            if player.last_seen == self._world_model.timestamp and player.color == Player.Color.UNKNOWN:
+            if (
+                player.last_seen == self._world_model.timestamp
+                and player.color == Player.Color.UNKNOWN
+                or not self._world_model.field.is_on_carpet(player.position)
+            ):
                 player.last_seen -= 0.001
 
         # Remember players that are currently not seen, but still have been seen recently.
