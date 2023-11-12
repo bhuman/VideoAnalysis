@@ -39,6 +39,7 @@ class Possession:
         """
         self._world_model: WorldModel = world_model
         self._categories: dict[str, list] = categories
+        self._categories.update({"Passes": [0, 0, ""]})
         self._categories.update({"Ball Possession": [0, 0, " s"]})
         self._distance_counter: DistanceCounter = distance_counter
 
@@ -50,10 +51,14 @@ class Possession:
 
         self.state: int = self.NONE
         self._possession_times: list[float] = [0, 0, 0]  # first team, second team, NONE
+        self._passes: list[int] = [0, 0, 0]
         self._timestamp: float = 0
-        self._ball_stopped: bool = False
+        self._ball_stopped: bool = True
         self._time_when_ball_stopped: float = 0
         self._player_in_ball_possession: Player | None = None
+        self._draw_player_in_ball_possession: bool = False
+        self._kick_position: npt.NDArray[np.float_] = self._world_model.ball.position
+        self._kick_distance: float = 0
 
     def update(self) -> None:
         """Update the ball possession category."""
@@ -66,7 +71,10 @@ class Possession:
                 if not self._ball_stopped:
                     self._time_when_ball_stopped = self._timestamp - self._distance_counter.time_ball_stopped
                     self._ball_stopped = True
-                    self._player_in_ball_possession = None
+                    self._kick_distance = np.linalg.norm(self._world_model.ball.position - self._kick_position).astype(
+                        float
+                    )
+                    self._draw_player_in_ball_possession = False
             else:
                 self._ball_stopped = False
                 self._time_when_ball_stopped = self._timestamp
@@ -74,12 +82,17 @@ class Possession:
             # Update current possession state.
             self._update_state()
 
+            if self._ball_stopped and self._kick_distance == 0:
+                self._kick_position = self._world_model.ball.position
+
             # Update statistics category.
             for team in range(2):
                 self._categories["Ball Possession"][team] = round(self._possession_times[team])
+                self._categories["Passes"][team] = self._passes[team]
         else:
             self.state = self.NONE
             self._player_in_ball_possession = None
+            self._draw_player_in_ball_possession = False
 
     def _update_state(self) -> None:
         """Update the ball possession state."""
@@ -105,14 +118,25 @@ class Possession:
         elif distances[self.state] > 0.6 and time_since_ball_stopped > 0.6 and distances[1 - self.state] < 0.4:
             self.state = 1 - self.state
             self._player_in_ball_possession = None
+            self._draw_player_in_ball_possession = False
+            self._kick_distance = 0
         elif distances[self.state] > 0.6 and time_since_ball_stopped > 1:
             self.state = self.NONE
+            self._kick_distance = 0
 
         # Update closest player for drawing methods.
         if self.state < 2 and time_since_ball_stopped > 0.6 and distances[self.state] < 0.4:
+            if (
+                self._kick_distance > 0.75
+                and self._player_in_ball_possession is not None
+                and self._player_in_ball_possession != closest_players[self.state]
+            ):
+                self._passes[self.state] += 1
+            self._kick_distance = 0
             self._player_in_ball_possession = closest_players[self.state]
+            self._draw_player_in_ball_possession = True
         elif self.state == self.NONE:
-            self._player_in_ball_possession = None
+            self._draw_player_in_ball_possession = False
 
         # Update one of the possession times.
         self._possession_times[self.state] += 1 / self._world_model.camera.fps
@@ -141,7 +165,8 @@ class Possession:
         :param context: The context to draw to.
         """
         if (
-            self._player_in_ball_possession is not None
+            self._draw_player_in_ball_possession
+            and self._player_in_ball_possession is not None
             and self._world_model.ball.last_seen == self._world_model.timestamp
         ):
             context.save()
@@ -158,7 +183,8 @@ class Possession:
         :param image: The image to draw to.
         """
         if (
-            self._player_in_ball_possession is not None
+            self._draw_player_in_ball_possession
+            and self._player_in_ball_possession is not None
             and self._player_in_ball_possession in self._world_model.players
             and self._world_model.ball.last_seen == self._world_model.timestamp
         ):
