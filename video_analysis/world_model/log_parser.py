@@ -66,8 +66,6 @@ class LogParser:
                         if "!action" in entry["entry"] and entry["entry"]["!action"]["source"] == "user":
                             filtered_entries.pop(-counter)
                             undos -= 1
-                        # elif "!gameState" in entry["entry"]:
-                        # filtered_entries.pop(-counter)
                         else:
                             counter += 1
                 elif (
@@ -81,7 +79,12 @@ class LogParser:
                     is_timeout = True
                 else:
                     if is_timeout:
-                        if "!gameState" in event and event["!gameState"]["state"] == "ready":
+                        if (
+                            "!action" in event
+                            and event["!action"]["source"] == "user"
+                            and event["!action"]["action"]["type"] == "startSetPlay"
+                            and event["!action"]["action"]["args"]["setPlay"] == "kickOff"
+                        ):
                             # The gameState-entry is the one starting the video again
                             # The time difference needs to be calculated here
                             secs = entry["timestamp"]["secs"]
@@ -126,24 +129,30 @@ class LogParser:
             log_start_time = metadata["timestamp"]
 
             self.teams = (away, home) if snd_half == home_team_left else (home, away)
+
+            # Find the beginning of the half.
             index = next(
                 x
                 for x in range(len(log_entries))
                 if "!gameState" in log_entries[x]["entry"]
-                and log_entries[x]["entry"]["!gameState"]["state"] == "ready"
                 and log_entries[x]["entry"]["!gameState"]["phase"] == ("secondHalf" if snd_half else "firstHalf")
+            )
+
+            # Find the first kick-off in the half. Might be right before the first game state.
+            index = next(
+                x
+                for x in range(index - 1, len(log_entries))
+                if "!action" in log_entries[x]["entry"]
+                and log_entries[x]["entry"]["!action"]["source"] == "user"
+                and log_entries[x]["entry"]["!action"]["action"]["type"] == "startSetPlay"
+                and log_entries[x]["entry"]["!action"]["action"]["args"]["setPlay"] == "kickOff"
             )
             assert index != -1
             log_entries = log_entries[index:]
 
-            ready_log_entry = next(
-                log_entry
-                for log_entry in log_entries
-                if "!gameState" in log_entry["entry"] and log_entry["entry"]["!gameState"]["state"] == "ready"
-            )
             self.start_time = log_start_time + timedelta(
-                seconds=ready_log_entry["timestamp"]["secs"],
-                microseconds=ready_log_entry["timestamp"]["nanos"] / 1000,
+                seconds=log_entries[0]["timestamp"]["secs"],
+                microseconds=log_entries[0]["timestamp"]["nanos"] / 1000,
             )
 
             self.basename = (
