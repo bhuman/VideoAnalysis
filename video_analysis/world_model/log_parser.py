@@ -131,17 +131,20 @@ class LogParser:
             self.teams = (away, home) if snd_half == home_team_left else (home, away)
 
             # Find the beginning of the half.
-            index = next(
-                x
-                for x in range(len(log_entries))
-                if "!gameState" in log_entries[x]["entry"]
-                and log_entries[x]["entry"]["!gameState"]["phase"] == ("secondHalf" if snd_half else "firstHalf")
-            )
+            if snd_half:
+                index = next(
+                    x
+                    for x in range(len(log_entries))
+                    if "!action" in log_entries[x]["entry"]
+                    and log_entries[x]["entry"]["!action"]["action"]["type"] == "switchHalf"
+                )
+            else:
+                index = 0
 
-            # Find the first kick-off in the half. Might be right before the first game state.
+            # Find the first kick-off in the half.
             index = next(
                 x
-                for x in range(index - 1, len(log_entries))
+                for x in range(index, len(log_entries))
                 if "!action" in log_entries[x]["entry"]
                 and log_entries[x]["entry"]["!action"]["source"] == "user"
                 and log_entries[x]["entry"]["!action"]["action"]["type"] == "startSetPlay"
