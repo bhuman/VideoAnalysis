@@ -67,33 +67,42 @@ class Statistics:
             self._localization = None
         self._possession: Possession = possession
         self._controlled_areas: ControlledAreas = controlled_areas
-        self._heatmap: npt.NDArray[np.float_] = np.zeros((740, 1040))
+        self._heatmap: list[npt.NDArray[np.float_]] = [
+            np.zeros((740, 1040)),
+            np.zeros((740, 1040)),
+            np.zeros((740, 1040)),
+        ]
 
     def update(self) -> None:
         """Update all statistics and the ball heat map."""
         for provider in self._providers:
             provider.update()
 
-        if (
-            self._world_model.game_state.state == self._world_model.game_state.State.PLAYING
-            and self._world_model.ball.last_seen == self._world_model.timestamp
-        ):
-            x_idx = np.maximum(70, np.minimum(int(np.round(self._world_model.ball.position[0] * 100) + 520), 970))
-            y_idx = np.maximum(70, np.minimum(int(np.round(self._world_model.ball.position[1] * 100) + 370), 670))
-            self._heatmap[y_idx][x_idx] += 1
+        if self._world_model.game_state.state == self._world_model.game_state.State.PLAYING:
+            if self._world_model.ball.last_seen == self._world_model.timestamp:
+                x_idx = np.maximum(70, np.minimum(int(np.round(self._world_model.ball.position[0] * 100) + 520), 970))
+                y_idx = np.maximum(70, np.minimum(int(np.round(self._world_model.ball.position[1] * 100) + 370), 670))
+                self._heatmap[2][y_idx][x_idx] += 1
+            for player in self._world_model.players:
+                x_idx = np.maximum(70, np.minimum(int(np.round(player.position[0] * 100) + 520), 970))
+                y_idx = np.maximum(70, np.minimum(int(np.round(player.position[1] * 100) + 370), 670))
+                self._heatmap[self._world_model.players.color_to_team(player.color)][y_idx][x_idx] += 1
 
-    def get_heatmap(self) -> npt.NDArray[np.uint8]:
+    def get_heatmap(self, index: int) -> npt.NDArray[np.uint8]:
         """Return the visual representation of the ball heat map.
 
+        :param index: 0 = left team, 1 = right team, 2 = ball
         :return: The heat map as bitmap.
         """
 
         # Blur heat map.
-        heatmap = nd.gaussian_filter(self._heatmap, sigma=20)
+        heatmap = np.sqrt(nd.gaussian_filter(self._heatmap[index], sigma=20))
 
         # Normalize it.
-        if (np.max(heatmap)) != 0.0:
-            heatmap = (heatmap - np.min(heatmap)) / (np.max(heatmap) - np.min(heatmap))  # type: ignore[operator]
+        maxValue = np.max(heatmap)
+        if maxValue != 0.0:
+            minValue = np.min(heatmap)
+            heatmap = (heatmap - minValue) / (maxValue - minValue)  # type: ignore[operator]
 
         # Set color map.
         heatmap = np.array(cm.jet_r(heatmap, bytes=True))  # pyright: ignore # Undocumented function

@@ -181,7 +181,7 @@ class VideoAnalysis:
 
         :param image: If selected view is an image view, draw onto this image.
         """
-        if self._settings["view"]["tab"] == "Field" or self._settings["view"]["tab"] == "Heat Map":
+        if self._settings["view"]["tab"] in ["Field", "Ball", "Left", "Right"]:
             self._draw_field()
         else:
             self._draw_image(
@@ -280,8 +280,16 @@ class VideoAnalysis:
         self._world_model.draw_on_field(ctx)
         self._statistics.draw_on_field(ctx)
 
-        draw_heatmap = self._settings["view"]["tab"] == "Heat Map"
-        if not draw_heatmap:
+        draw_heatmap = (
+            0
+            if self._settings["view"]["tab"] == "Left"
+            else 1
+            if self._settings["view"]["tab"] == "Right"
+            else 2
+            if self._settings["view"]["tab"] == "Ball"
+            else -1
+        )
+        if draw_heatmap == -1:
             self._statistics.draw_on_field(ctx)
 
         bitmap = np.reshape(
@@ -289,9 +297,10 @@ class VideoAnalysis:
         )
 
         assert self._ui is not None
-        if draw_heatmap:
-            heatmap = self._statistics.get_heatmap()
+        if draw_heatmap != -1:
+            heatmap = self._statistics.get_heatmap(draw_heatmap)
             heatmap_on_field = cv2.addWeighted(heatmap, 0.7, bitmap, 0.3, 0)
-            self._ui.set_field("heatmap", heatmap_on_field)
+            heatmaps = ["left", "right", "ball"]
+            self._ui.set_field(heatmaps[draw_heatmap], heatmap_on_field)
         else:
             self._ui.set_field("field", bitmap)

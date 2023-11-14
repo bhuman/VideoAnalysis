@@ -72,7 +72,9 @@ class UI:
         with dpg.texture_registry():
             dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="video")  # pyright: ignore
             dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="field")  # pyright: ignore
-            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="heatmap")  # pyright: ignore
+            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="ball")  # pyright: ignore
+            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="left")  # pyright: ignore
+            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="right")  # pyright: ignore
             dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="green")  # pyright: ignore
             dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="white")  # pyright: ignore
 
@@ -144,10 +146,18 @@ class UI:
                                 with dpg.group(horizontal=True, horizontal_spacing=0, tag="field_group"):
                                     dpg.add_image("field", tag="field_image")
                                     dpg.add_spacer(tag="field_padding")
-                            with dpg.tab(label="Heat Map", tag="Heat Map"):
-                                with dpg.group(horizontal=True, horizontal_spacing=0, tag="heatmap_group"):
-                                    dpg.add_image("heatmap", tag="heatmap_image")
-                                    dpg.add_spacer(tag="heatmap_padding")
+                            with dpg.tab(label="Ball", tag="Ball"):
+                                with dpg.group(horizontal=True, horizontal_spacing=0, tag="ball_group"):
+                                    dpg.add_image("ball", tag="ball_image")
+                                    dpg.add_spacer(tag="ball_padding")
+                            with dpg.tab(label="Left", tag="Left"):
+                                with dpg.group(horizontal=True, horizontal_spacing=0, tag="left_group"):
+                                    dpg.add_image("left", tag="left_image")
+                                    dpg.add_spacer(tag="left_padding")
+                            with dpg.tab(label="Right", tag="Right"):
+                                with dpg.group(horizontal=True, horizontal_spacing=0, tag="right_group"):
+                                    dpg.add_image("right", tag="right_image")
+                                    dpg.add_spacer(tag="right_padding")
                             with dpg.tab(label="Green", tag="Green"):
                                 dpg.add_image("green", tag="green_image")
                             with dpg.tab(label="White", tag="White"):
@@ -200,7 +210,7 @@ class UI:
     def set_field(self, type_: str, field) -> None:
         """Replace the field drawing with a new one.
 
-        :param type_: The type of the view to replace ("field" or "heatmap").
+        :param type_: The type of the view to replace ("field", "ball", "left", or "right").
         :param field: The new field drawing.
         """
         field = cv2.cvtColor(field, cv2.COLOR_RGB2BGRA)
@@ -368,7 +378,9 @@ class UI:
         # Delete old images
         dpg.delete_item("video_image")
         dpg.delete_item("field_image")
-        dpg.delete_item("heatmap_image")
+        dpg.delete_item("ball_image")
+        dpg.delete_item("left_image")
+        dpg.delete_item("right_image")
         dpg.delete_item("green_image")
         dpg.delete_item("white_image")
 
@@ -384,20 +396,40 @@ class UI:
             tag="field_image",
         )
         dpg.add_image(
-            "heatmap",
-            parent="heatmap_group",
+            "ball",
+            parent="ball_group",
             width=int(field_width),
             height=int(image_height),
             indent=left_padding,
-            before="heatmap_padding",
-            tag="heatmap_image",
+            before="ball_padding",
+            tag="ball_image",
+        )
+        dpg.add_image(
+            "left",
+            parent="left_group",
+            width=int(field_width),
+            height=int(image_height),
+            indent=left_padding,
+            before="left_padding",
+            tag="left_image",
+        )
+        dpg.add_image(
+            "right",
+            parent="right_group",
+            width=int(field_width),
+            height=int(image_height),
+            indent=left_padding,
+            before="right_padding",
+            tag="right_image",
         )
         dpg.add_image("green", parent="Green", width=int(image_width), height=int(image_height), tag="green_image")
         dpg.add_image("white", parent="White", width=int(image_width), height=int(image_height), tag="white_image")
 
         # Adapt a few sizes
         dpg.set_item_width("field_padding", right_padding)
-        dpg.set_item_width("heatmap_padding", right_padding)
+        dpg.set_item_width("ball_padding", right_padding)
+        dpg.set_item_width("left_padding", right_padding)
+        dpg.set_item_width("right_padding", right_padding)
         dpg.set_item_width("team0", table_width)
         dpg.set_item_height("team0", table_height)
         dpg.set_item_width("team1", table_width)
