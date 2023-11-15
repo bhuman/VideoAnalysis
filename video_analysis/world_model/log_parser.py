@@ -246,10 +246,7 @@ class LogParser:
             start_time = datetime.strptime(start_time, "%Y.%m.%d-%H.%M.%S").strftime("%Y-%m-%d_%H-%M")
 
             # Define unique basename for this half.
-            self.basename = (
-                f"{start_time}_{home.name.replace(' ', '_')}_"
-                + f"{away.name.replace(' ', '_')}_{'2nd' if snd_half else '1st'}_Half"
-            )
+            self.basename = f"{start_time}_{home.name}_{away.name}_{'2nd' if snd_half else '1st'}_Half"
 
             # Start at first ready state, store teams.
             if snd_half:
