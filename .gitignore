@@ -11,6 +11,7 @@ __pycache__
 /backgrounds
 /config/*Half.json
 /data
+/heatmaps
 /runs
 /statistics
 /weights/yolov5n6.pt

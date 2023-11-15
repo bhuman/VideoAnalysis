@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import cairo
+import cv2
 import numpy as np
 import numpy.typing as npt
 import scipy.ndimage as nd
@@ -141,6 +142,13 @@ class Statistics:
 
             # Restore locale for numbers.
             locale.setlocale(locale.LC_NUMERIC, saved_locale)
+
+        # Save heatmaps
+        path = ROOT / "heatmaps" / basename
+        path.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(path.joinpath(f"{self._world_model.game_state.teams[0].name}_left.jpg")), self.get_heatmap(0))
+        cv2.imwrite(str(path.joinpath(f"{self._world_model.game_state.teams[1].name}_right.jpg")), self.get_heatmap(1))
+        cv2.imwrite(str(path.joinpath("ball.jpg")), self.get_heatmap(2))
 
     def draw_on_field(self, context: cairo.Context) -> None:
         """Draw visualization of some statistics onto the field.
