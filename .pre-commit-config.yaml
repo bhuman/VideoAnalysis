@@ -1,5 +1,5 @@
 default_language_version:
-  python: python3.8
+  python: python3
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -22,7 +22,7 @@ repos:
         args: [--markdown-linebreak-ext=md] # Preserve Markdown hard linebreaks
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.10.1
+    rev: 5.12.0
     hooks:
       - id: isort
 
@@ -62,5 +62,5 @@ repos:
     rev: v0.971
     hooks:
       - id: mypy
-        args: []
+        args: [--no-warn-unused-ignores]
         additional_dependencies: [types-PyYAML]
