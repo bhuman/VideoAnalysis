@@ -1,6 +1,6 @@
 # Multi Object Tracker
 ipywidgets==8.0.4
-motrackers
+motrackers==0.0.1
 
 # GPMF Parsing
 telemetry_parser>=0.2.8
@@ -8,6 +8,7 @@ telemetry_parser>=0.2.8
 # YOLOv5
 yolov5>=7.0.0
 pafy>=0.5.5
+torchvision<=0.15.2
 youtube_dl==2020.12.2
 
 pycairo>=1.21.0
