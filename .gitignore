@@ -11,6 +11,7 @@ __pycache__
 /backgrounds
 /config/*Half.json
 /data
+/downloads
 /heatmaps
 /runs
 /statistics

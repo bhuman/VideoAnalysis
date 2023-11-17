@@ -1,0 +1,67 @@
+#!/bin/bash
+# This script analyzes multiple game videos.
+# It reads the data about what to process from the standard input.
+# The data piped into the script must be in the format of the file
+# "videos_and_logs.csv" from the repository "SPLGames". It will
+# then download all the videos and GameController logs mentioned
+# in the input and call the script "analyze" game half by game
+# half. Downloaded files are stored in the subdirectory
+# "downloads". They are only downloaded if they do not already
+# exist in that directory. Note that there is no check whether the
+# downloaded version is identical to the one found on the server.
+# It is possible to prepare separate settings files for each field
+# games took place on. Simply name them "config/settings-X.json",
+# where "X" stands for the letter of the field. They will replace
+# the file "config/settings.json" before "analyze" is called. The
+# original file "config/settings.json" is not saved. Therefore it
+# only makes sense to either provide no such files or one for each
+# field.
+# Note that the downloads are huge, i.e. you will need a lot of
+# space!
+
+BASE=$(cd "$(dirname "$(which "$0")")"; pwd)
+TABLE="$(cat)"
+GC_URLS="$(sed <<<"$TABLE" 's%.*,\([^,]*\),.*%\1%' | sort | uniq)"
+
+mkdir -p downloads
+
+while read GC_URL; do
+  if [ ! -z "$GC_URL" ]; then
+    GC_LOG="downloads/$(sed <<<"$GC_URL" 's%.*/%%')"
+    if [ ! -f "$GC_LOG" ]; then
+      curl "$GC_URL" >"$GC_LOG"
+    fi
+    GAME="$(grep "$GC_URL" <<<"$TABLE")"
+    declare -a VIDEOS
+    for HALF_NUM in 1 2; do
+      echo "$(sed <<<"$GC_LOG" 's%.*/\([^.]*\).*%\1%'), half $HALF_NUM"
+      HALF="$(grep "^[^,]*,[^,]*,[^,]*,$HALF_NUM," <<<"$GAME")"
+      VIDEOS=()
+      while read PART; do
+        FIELD="$(sed <<<"$PART" 's%^[^,]*,[^,]*,\([^,]*\).*%\1%')"
+        VIDEO_URL="$(sed <<<"$PART" 's%.*,\([^,]*\),[^,]*,.*%\1%')"
+        if [ ! -z "$VIDEO_URL" ]; then
+          mkdir -p "downloads/$FIELD"
+          VIDEO="downloads/$FIELD/$(sed <<<"$VIDEO_URL" 's%.*/%%')"
+          if [ ! -f "$VIDEO" ]; then
+            curl "$VIDEO_URL" >"$VIDEO"
+          fi
+          VIDEOS+="$VIDEO"
+        else
+          break
+        fi
+      done <<<"$HALF"
+      if [ ! -z "$VIDEOS" ]; then
+        if [ -f "$BASE/../config/settings-$FIELD.json" ]; then
+          cp "$BASE/../config/settings-$FIELD.json" "$BASE/../config/settings.json"
+        fi
+        echo -n "\"$BASE/analyze\" --half $HALF_NUM --log \"$GC_LOG\""
+        for VIDEO in ${VIDEOS[@]}; do echo -n " \"$VIDEO\""; done
+        echo ""
+        "$BASE/analyze" --headless --half $HALF_NUM --log "$GC_LOG" ${VIDEOS[@]}
+      else
+        echo "No video"
+      fi
+    done
+  fi
+done <<<"$GC_URLS"
