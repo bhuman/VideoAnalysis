@@ -93,9 +93,9 @@ probably best to setup a virtual environment and activate it.[^1] Then run
 
 ## Usage
 
-To analyze a recorded game, run `bin/analyze.py`. Example:
+To analyze a recorded game, run `bin/analyze`. Example:
 
-    bin/analyze.py --log /path/to/gamecontroller-log /paths/to/videos
+    bin/analyze --log /path/to/gamecontroller-log /paths/to/videos
 
 When a video is opened for the first time, an extrinsic camera calibration is
 performed, which delays the start for a while. A half can consist of multiple
