@@ -34,6 +34,8 @@ class Possession:
         :param distance_counter: An object that determines whether the ball is moving. There is a cyclic dependency
         with that object, because it also uses information about ball possession. Therefore, both have a reference
         to the other.
+        :param ball_movement_time: An object that determines how long the ball is moving. To register the categories
+        in the desired order, this object calls the method that will register that category.
         :param categories: The statistics categories that are extended by this object. This object will also add
         the categories for `distance_counter` to make them appear after the category of this object.
         """
