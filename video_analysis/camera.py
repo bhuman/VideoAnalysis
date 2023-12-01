@@ -347,7 +347,7 @@ class Camera:
                 progress_bar.update(1)
                 if i >= images:
                     break
-        return cv2.cvtColor(subtractor.getBackgroundImage(), cv2.COLOR_BGR2RGB)
+        return subtractor.getBackgroundImage()
 
     @staticmethod
     def _skeleton(mask: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:

@@ -193,7 +193,7 @@ class VideoAnalysis:
 
         :param image: Draw onto this image or use it to draw segmentation masks.
         """
-        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
         assert self._ui is not None
         if self._settings["view"]["tab"] == "White":
