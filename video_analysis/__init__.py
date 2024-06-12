@@ -278,7 +278,6 @@ class VideoAnalysis:
         ctx.set_font_matrix(fm)
 
         self._world_model.draw_on_field(ctx)
-        self._statistics.draw_on_field(ctx)
 
         draw_heatmap = (
             0
