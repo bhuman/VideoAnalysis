@@ -46,7 +46,7 @@ while read GC_URL; do
           if [ ! -f "$VIDEO" ]; then
             curl "$VIDEO_URL" >"$VIDEO"
           fi
-          VIDEOS+="$VIDEO"
+          VIDEOS+=("$VIDEO")
         else
           break
         fi
