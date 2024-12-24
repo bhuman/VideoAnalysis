@@ -27,6 +27,7 @@ class GameState:
         SET = 2
         PLAYING = 3
         FINISHED = 4
+        STANDBY = 5
 
     def __init__(self, log: os.PathLike | str, snd_half: bool, settings: dict[str, Any]) -> None:
         """Initialize this instance by reading a GameController log.
@@ -105,4 +106,6 @@ class GameState:
             self.state = self.State.SET
         elif self.current_game_state["state"] == "playing":
             self.state = self.State.PLAYING
+        elif self.current_game_state["state"] == "standby":
+            self.state = self.State.STANDBY
         # TODO: This doesn't work in a lot of situations (e.g. timeouts)

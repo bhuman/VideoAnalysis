@@ -82,8 +82,11 @@ class LogParser:
                         if (
                             "!action" in event
                             and event["!action"]["source"] == "user"
-                            and event["!action"]["action"]["type"] == "startSetPlay"
-                            and event["!action"]["action"]["args"]["setPlay"] == "kickOff"
+                            and (
+                                event["!action"]["action"]["type"] == "waitForReady"
+                                or event["!action"]["action"]["type"] == "startSetPlay"
+                                and event["!action"]["action"]["args"]["setPlay"] == "kickOff"
+                            )
                         ):
                             # The gameState-entry is the one starting the video again
                             # The time difference needs to be calculated here
@@ -147,8 +150,11 @@ class LogParser:
                 for x in range(index, len(log_entries))
                 if "!action" in log_entries[x]["entry"]
                 and log_entries[x]["entry"]["!action"]["source"] == "user"
-                and log_entries[x]["entry"]["!action"]["action"]["type"] == "startSetPlay"
-                and log_entries[x]["entry"]["!action"]["action"]["args"]["setPlay"] == "kickOff"
+                and (
+                    log_entries[x]["entry"]["!action"]["action"]["type"] == "waitForReady"
+                    or log_entries[x]["entry"]["!action"]["action"]["type"] == "startSetPlay"
+                    and log_entries[x]["entry"]["!action"]["action"]["args"]["setPlay"] == "kickOff"
+                )
             )
             assert index != -1
             log_entries = log_entries[index:]
