@@ -44,7 +44,7 @@ from video_analysis import VideoAnalysis  # noqa: E402
 )
 @click.option("-n", "--every-nth-frame", type=int, default=10, show_default=True, help="Only process every nth frame.")
 @click.option("--headless", is_flag=True, help="Run without window.")
-@click.option("-f", "--force", is_flag=True, help="Force new camera calibration.")
+@click.option("--force", is_flag=True, help="Force new camera calibration.")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output during camera calibration.")
 def cli(
     videos: list[str],

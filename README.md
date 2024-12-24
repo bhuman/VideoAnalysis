@@ -131,7 +131,7 @@ locale-aware version of the comma-separated values format.
   - `--headless`: Run the app without user interface. This option can be used to
     just create the statistics file that is written in the end.
 
-  - `-f`, `--force`: Force a new camera calibration. The first time a video is
+  - `--force`: Force a new camera calibration. The first time a video is
     analyzed, a camera calibration is automatically performed and stored. Normally,
     this calibration will be used during further playbacks of the same video. This
     switch overwrites this behavior.
