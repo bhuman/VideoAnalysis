@@ -247,7 +247,9 @@ class Camera:
         )  # We only select every hundredth image for a better quality of the calibration
 
         if self.background is None:
-            self.background = self._read_video_background(dataset, self._settings["calibration"]["images"])
+            self.background = self._read_video_background(
+                dataset, self._settings["calibration"]["images"], self._settings["calibration"]["skip_first_images"]
+            )
             (ROOT / "backgrounds").mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(background_path), self.background)
 
@@ -336,21 +338,26 @@ class Camera:
         return points_in_image[0] if single else points_in_image
 
     @staticmethod
-    def _read_video_background(dataset: SourceAdapter, images: int) -> cv2t.MatLike:
+    def _read_video_background(dataset: SourceAdapter, images: int, skip: int) -> cv2t.MatLike:
         """Determine the video background from a list of images.
 
         This only works if foreground objects move sufficiently in the dataset.
         :param dataset: The dataset that contains the images. The original images are used.
-        :param images: The number of images to use.
+        :param images: The number of images actually used.
+        :param skip_first_images: The number of images that are skipped at the beginning.
         :return: The background image, i.e. foreground object are mostly removed.
         """
         subtractor = cv2.createBackgroundSubtractorMOG2()
-        with click.progressbar(length=images) as progress_bar:
+        with click.progressbar(length=images + skip) as progress_bar:
             for i, (_, image) in enumerate(dataset):
-                subtractor.apply(image)
-                progress_bar.update(1)
-                if i >= images:
-                    break
+                if i >= skip:
+                    subtractor.apply(image)
+                    progress_bar.update(1)
+                    if i >= images + skip:
+                        break
+                else:
+                    progress_bar.update(1)
+
         return subtractor.getBackgroundImage()
 
     @staticmethod

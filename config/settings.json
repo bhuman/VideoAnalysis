@@ -32,6 +32,7 @@
         },
         "images": 150,
         "step_size": 100,
+        "skip_first_images": 36,
         "outlier_threshold": 3,
         "iterations": 30
     },
