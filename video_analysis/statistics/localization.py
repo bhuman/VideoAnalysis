@@ -154,17 +154,18 @@ class Localization:
             index: int = 0 if self._world_model.game_state.teams[0].number == team_num else 1
             side: int = 1 if index == 0 else -1
             position: npt.NDArray[np.float_] = np.array([data[5] * side / 1000, data[6] * side / 1000])
-            distances: dict[Player, float] = {
-                player: np.linalg.norm(position - player.position).astype(float) for player in players
-            }
-            if str(player_num) not in self._player_statuses[index]:
-                self._player_statuses[index][str(player_num)] = Localization.PlayerStatus(position, distances)
-                if self._world_model.game_state.current_game_state:
-                    self._update_status(index, player_num)
-            else:
-                status: Localization.PlayerStatus = self._player_statuses[index][str(player_num)]
-                status.position = position
-                status.distances = distances
+            if np.isfinite(position[0]) and np.isfinite(position[1]):
+                distances: dict[Player, float] = {
+                    player: np.linalg.norm(position - player.position).astype(float) for player in players
+                }
+                if str(player_num) not in self._player_statuses[index]:
+                    self._player_statuses[index][str(player_num)] = Localization.PlayerStatus(position, distances)
+                    if self._world_model.game_state.current_game_state:
+                        self._update_status(index, player_num)
+                else:
+                    status: Localization.PlayerStatus = self._player_statuses[index][str(player_num)]
+                    status.position = position
+                    status.distances = distances
 
         # Solve the assignment problem.
         self._solve()
