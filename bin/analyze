@@ -97,4 +97,4 @@ def cli(
 if __name__ == "__main__":
     # force=True because yolov5 instantiates its own logger without respecting the user.
     logging.basicConfig(level=logging.INFO, format="{levelname:>8}: {message}", style="{", force=True)
-    cli()  # pylint: disable=no-value-for-parameter
+    cli()

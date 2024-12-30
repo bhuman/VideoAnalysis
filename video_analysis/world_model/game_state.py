@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import os
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .log_parser import LogParser
+
+if TYPE_CHECKING:
+    import os
 
 ROOT = Path(__file__).resolve().parents[2]
 

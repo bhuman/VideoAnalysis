@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import statistics
 from collections import deque
-from collections.abc import Iterator
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
-import cairo
 import cv2
 import motrackers
 import numpy as np
 
-from ..camera import Camera
-
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    import cairo
     import numpy.typing as npt
 
+    from ..camera import Camera
     from . import WorldModel
 
 
@@ -73,7 +73,7 @@ class Player:
                 (192, 192, 192),  # GRAY
             ][self.value]
             if bgr:
-                color = color[::-1]  # type: ignore[assignment]
+                color = color[::-1]  # pyright: ignore[reportGeneralTypeIssues]
             if range01:
                 color = (color[0] / 255, color[1] / 255, color[2] / 255)
             return color

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from ..world_model import WorldModel
+if TYPE_CHECKING:
+    from ..world_model import WorldModel
 
 
 class GCStats:

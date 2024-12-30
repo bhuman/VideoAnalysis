@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 from math import ceil
+from typing import TYPE_CHECKING
 
-import cairo
 import cv2
 import numpy as np
-import numpy.typing as npt
-from scipy.spatial import Voronoi  # pylint: disable=no-name-in-module
+from scipy.spatial import Voronoi
 from scipy.spatial._qhull import QhullError
 from shapely.geometry import Polygon
 
-from ..world_model import WorldModel
-from ..world_model.players import Player
-from .localization import Localization
+if TYPE_CHECKING:
+    import cairo
+    import numpy.typing as npt
+
+    from ..world_model import WorldModel
+    from ..world_model.players import Player
+    from .localization import Localization
 
 
 class ControlledAreas:
@@ -217,6 +220,5 @@ class ControlledAreas:
                 offset = point - last_point
                 length = np.linalg.norm(offset)
                 steps = int(ceil(length / self._max_line_length))
-                for j in range(1, steps + 1):
-                    result.append(last_point + offset * j / steps)
+                result += [last_point + offset * j / steps for j in range(1, steps + 1)]
         return np.asarray(result)

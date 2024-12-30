@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import shutil
+import sys
 import zipfile
 from itertools import count, repeat
 from pathlib import Path
@@ -16,9 +17,13 @@ import tqdm
 import yaml
 from yolov5.utils.dataloaders import LoadImages
 
-from video_analysis.detection import Detector
+ROOT = Path(__file__).resolve().parents[1]  # 1 folder up.
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # Add ROOT to PATH.
 
-from .csv2yolov5 import CLASSES as CSV_CLASSES
+from video_analysis.detection import Detector  # noqa: E402
+
+from .csv2yolov5 import CLASSES as CSV_CLASSES  # noqa: E402
 
 # of these, use every 'TEST_RATIO' as test images
 TEST_RATIO = 10
@@ -67,20 +72,18 @@ def _yolov1_to_yolov5(dataset_path: Path) -> None:
             if match is not None:
                 meta[match["key"]] = match["value"]
 
-    classes_path = dataset_path / meta.pop("names")
-    dataset_classes: list[str] = []
+    classes_path = dataset_path / meta.pop("names").lstrip("data/")
     with classes_path.open() as f:
-        for class_name in f:
-            dataset_classes.append(class_name.strip())
+        dataset_classes: list[str] = [class_name.strip() for class_name in f]
 
     del meta["classes"]
 
     sample_count = 0
 
     for subset_index_filename in meta.values():
-        subset_index_path = dataset_path / subset_index_filename
+        subset_index_path = dataset_path / subset_index_filename.lstrip("data/")
         with subset_index_path.open() as f:
-            img_filenames = [img_filename.strip() for img_filename in f]
+            img_filenames = [img_filename.strip().lstrip("data/") for img_filename in f]
         for img_path, label_path in (
             (dataset_path / img_filename, (dataset_path / img_filename).with_suffix(".txt"))
             for img_filename in img_filenames
@@ -94,9 +97,9 @@ def _yolov1_to_yolov5(dataset_path: Path) -> None:
                 class_idx, x_center, y_center, width, height = label.strip().split(" ")
                 class_idx = str(CLASSES.index(dataset_classes[int(class_idx)]))
                 mapped_labels.append(" ".join([class_idx, x_center, y_center, width, height]))
-            (labels_path / subset / label_path.name).write_text("\n".join(mapped_labels))
+            (labels_path / subset / f"{subset_index_path.stem}_{label_path.name}").write_text("\n".join(mapped_labels))
 
-            shutil.copyfile(img_path, imgs_path / subset / img_path.name)
+            shutil.copyfile(img_path, imgs_path / subset / f"{subset_index_path.stem}_{img_path.name}")
             sample_count += 1
 
     meta_path = out_dataset_path / f"{dataset_path.name}.yaml"
@@ -112,7 +115,85 @@ def _yolov1_to_yolov5(dataset_path: Path) -> None:
         yaml.safe_dump(content, f, sort_keys=False)
 
 
-def _label(dataset_path: Path, model_weights: Path, dataset_name: str | None = None) -> Path | None:
+def _merge(input_paths: list[Path], dataset_name: str) -> Path:
+    out_dataset_path = LABELED_PATH / dataset_name
+    imgs_path = out_dataset_path / "images"
+    labels_path = out_dataset_path / "labels"
+
+    train_images_path: Path = imgs_path / "train"
+    val_images_path: Path = imgs_path / "val"
+    test_images_path: Path = imgs_path / "test"
+    train_labels_path: Path = labels_path / "train"
+    val_labels_path: Path = labels_path / "val"
+    test_labels_path: Path = labels_path / "test"
+
+    train_images_path.mkdir(parents=True)
+    val_images_path.mkdir(parents=True)
+    test_images_path.mkdir(parents=True)
+    train_labels_path.mkdir(parents=True)
+    val_labels_path.mkdir(parents=True)
+    test_labels_path.mkdir(parents=True)
+
+    for dataset_path in input_paths:
+        meta_path = dataset_path / f"{dataset_path.name}.yaml"
+        if not meta_path.is_file():
+            msg = (
+                f"{dataset_path.name}.yaml could not be found in {dataset_path}. please ensure its availability and"
+                " correct format."
+            )
+            raise ValueError(msg)
+
+        with meta_path.open() as f:
+            meta: dict = yaml.safe_load(f)
+
+        dataset_classes = meta["names"]
+
+        for subset in ["train", "val", "test"]:
+            if subset not in meta:
+                msg = (
+                    f"subset {subset} not found in {meta_path}, please ensure that the dataset consists of train, val"
+                    " and test subsets."
+                )
+                raise ValueError(msg)
+            subset_path = meta_path.parent / Path(meta[subset])
+            for image_path in subset_path.iterdir():
+                if not image_path.is_file():
+                    continue
+                label_path = Path("labels".join(str(image_path).rsplit("images", 1))).with_suffix(".txt")
+                if not label_path.is_file():
+                    msg = (
+                        f"the label file {label_path.relative_to(dataset_path)} corresponding to image"
+                        f" {image_path.relative_to(dataset_path)} could not be found."
+                    )
+                    raise ValueError(msg)
+                with label_path.open() as f:
+                    labels = f.readlines()
+
+                mapped_labels = []
+                for label in labels:
+                    class_idx, x_center, y_center, width, height = label.strip().split(" ")
+                    class_idx = str(CLASSES.index(dataset_classes[int(class_idx)]))
+                    mapped_labels.append(" ".join([class_idx, x_center, y_center, width, height]))
+                (labels_path / subset / f"{dataset_path.stem}_{label_path.name}").write_text("\n".join(mapped_labels))
+
+                shutil.copyfile(image_path, imgs_path / subset / f"{dataset_path.stem}_{image_path.name}")
+
+    meta_path = out_dataset_path / f"{dataset_name}.yaml"
+    with meta_path.open("w", encoding="UTF-8", newline="\n") as f:
+        content = {
+            "path": out_dataset_path.resolve().as_posix(),
+            "train": train_images_path.relative_to(out_dataset_path).as_posix(),
+            "val": val_images_path.relative_to(out_dataset_path).as_posix(),
+            "test": test_images_path.relative_to(out_dataset_path).as_posix(),
+            "nc": len(CLASSES),
+            "names": CLASSES,
+        }
+        yaml.safe_dump(content, f, sort_keys=False)
+
+    return out_dataset_path
+
+
+def _label(dataset_path: Path, model_weights: Path, dataset_name: str | None = None) -> Path:
     if dataset_name is None:
         dataset_name = dataset_path.stem
 
@@ -120,7 +201,7 @@ def _label(dataset_path: Path, model_weights: Path, dataset_name: str | None = N
     settings_path = ROOT / "config" / "settings.json"
 
     with settings_path.open(encoding="UTF-8", newline="\n") as file:
-        settings: dict[str, Any] = json.load(file)  # noqa: F821
+        settings: dict[str, Any] = json.load(file)
 
     device = settings["detector"]["device"]
     if device == "":
@@ -142,11 +223,11 @@ def _label(dataset_path: Path, model_weights: Path, dataset_name: str | None = N
         max_det=settings["detector"]["max_det"],
     )
     imgsz = detector.imgsz
-    stride: int = detector.model.stride  # pyright: ignore # Typing issue.
-    pt: bool = detector.model.pt  # pyright: ignore # Typing issue.
+    stride: int = detector.model.stride  # pyright: ignore[reportGeneralTypeIssues] # Typing issue.
+    pt: bool = detector.model.pt  # pyright: ignore[reportGeneralTypeIssues] # Typing issue.
 
     # Load data again
-    dataset = LoadImages(dataset_path, img_size=imgsz, stride=stride, auto=pt)
+    dataset = LoadImages(dataset_path, img_size=imgsz, stride=stride, auto=pt)  # pyright: ignore[reportGeneralTypeIssues]
 
     out_dataset_path = PRELABELED_PATH / dataset_name
     imgs_path = out_dataset_path / "imgs"
@@ -330,5 +411,23 @@ if __name__ == "__main__":
     def yolov1_to_yolov5(dataset_paths: list[Path]) -> None:
         for dataset_path in tqdm.tqdm(dataset_paths):
             _yolov1_to_yolov5(dataset_path=dataset_path)
+
+    @cli.command()
+    @click.argument("dataset_name", type=str)
+    @click.argument(
+        "dataset_paths",
+        type=click.Path(
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            writable=False,
+            readable=True,
+            resolve_path=True,
+            path_type=Path,
+        ),
+        nargs=-1,
+    )
+    def merge(dataset_paths: list[Path], dataset_name: str) -> None:
+        _merge(input_paths=dataset_paths, dataset_name=dataset_name)
 
     cli()

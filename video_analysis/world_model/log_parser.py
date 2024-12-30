@@ -43,8 +43,8 @@ class LogParser:
             loader = Loader
             loader.add_multi_constructor("", generic_constructor)
 
-            document = open(log, encoding="UTF-8", newline="\n")
-            log_entries = load(document, Loader=Loader)
+            with open(log, encoding="UTF-8", newline="\n") as document:
+                log_entries = load(document, Loader=Loader)
 
             # Undo filtering
             filtered_entries: list[Any] = []
@@ -91,13 +91,13 @@ class LogParser:
                             nanos = entry["timestamp"]["nanos"]
                             current_timedelta += timedelta(seconds=secs, microseconds=nanos / 1000) - begin_timeout
 
-                            # There is a delay for stopping the video and one for starting the video
-                            # Both must be considered
-                            current_timedelta += timedelta(
-                                seconds=self._settings["log_parser"]["video_start_delay"]
-                                - self._settings["log_parser"]["video_stop_delay"]
-                            )
-                            is_timeout = False
+                        # There is a delay for stopping the video and one for starting the video
+                        # Both must be considered
+                        current_timedelta += timedelta(
+                            seconds=self._settings["log_parser"]["video_start_delay"]
+                            - self._settings["log_parser"]["video_stop_delay"]
+                        )
+                        is_timeout = False
                     if not is_timeout:
                         if "!statusMessage" in event:
                             decoded_msg = base64.b64decode(event["!statusMessage"]["data"])

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import cairo
 import cv2
 import numpy as np
 import numpy.typing as npt
 
 if TYPE_CHECKING:
+    import cairo
+
     from . import WorldModel
 
 
@@ -90,6 +91,9 @@ class Ball:
 
         :param image: The image to draw onto.
         """
+        if self.last_seen != self._world_model.timestamp:
+            return
+
         angles = np.linspace(0, 2 * np.pi, 16, endpoint=False)
         points_in_world = self.position + np.stack([np.cos(angles), np.sin(angles)], axis=-1) * 0.1
         points_in_image = self._world_model.camera.world2image(points_in_world)

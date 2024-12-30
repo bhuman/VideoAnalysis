@@ -3,16 +3,13 @@ from __future__ import annotations
 import csv
 import locale
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import cairo
 import cv2
 import numpy as np
-import numpy.typing as npt
 import scipy.ndimage as nd
 from matplotlib import cm
 
-from ..world_model import WorldModel
 from .ball_isolation_time import BallIsolationTime
 from .ball_movement_time import BallMovementTime
 from .controlled_areas import ControlledAreas
@@ -22,6 +19,13 @@ from .gc_stats import GCStats
 from .goal_distance import GoalDistance
 from .localization import Localization
 from .possession import Possession
+
+if TYPE_CHECKING:
+    import cairo
+    import numpy.typing as npt
+
+    from ..world_model import WorldModel
+
 
 ROOT = Path(__file__).resolve().parents[2]  # 2 folder up.
 
@@ -100,13 +104,13 @@ class Statistics:
         heatmap = np.sqrt(nd.gaussian_filter(self._heatmap[index], sigma=20))
 
         # Normalize it.
-        maxValue = np.max(heatmap)
-        if maxValue != 0.0:
-            minValue = np.min(heatmap)
-            heatmap = (heatmap - minValue) / (maxValue - minValue)  # type: ignore[operator]
+        max_value = np.max(heatmap)
+        if max_value != 0.0:
+            min_value = np.min(heatmap)
+            heatmap = (heatmap - min_value) / (max_value - min_value)  # type: ignore[operator]
 
         # Set color map.
-        heatmap = np.array(cm.jet_r(heatmap, bytes=True))  # pyright: ignore # Undocumented function
+        heatmap = np.array(cm.jet_r(heatmap, bytes=True))  # pyright: ignore[reportGeneralTypeIssues] # Undocumented function
 
         # The heat map is upside down. Flip and return it.
         return np.flip(heatmap, axis=0)

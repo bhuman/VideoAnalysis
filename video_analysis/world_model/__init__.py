@@ -1,18 +1,22 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import cairo
-import numpy as np
-import numpy.typing as npt
-
-from ..camera import Camera
 from .ball import Ball
 from .field import Field
 from .game_state import GameState
 from .players import Players
+
+if TYPE_CHECKING:
+    import os
+
+    import cairo
+    import numpy as np
+    import numpy.typing as npt
+
+    from ..camera import Camera
+
 
 ROOT = Path(__file__).resolve().parents[2]  # 2 folder up.
 
@@ -87,5 +91,4 @@ class WorldModel:
         :param image: The image to draw onto.
         """
         self.players.draw_on_image(image)
-        if self.ball.last_seen == self.timestamp:
-            self.ball.draw_on_image(image)
+        self.ball.draw_on_image(image)

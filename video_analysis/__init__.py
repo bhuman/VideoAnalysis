@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import cairo
 import click
 import cv2
 import numpy as np
-import numpy.typing as npt
 import torch
 import torch.backends.mps
-from click._termui_impl import ProgressBar
 from torch.backends import cudnn
 from yolov5.utils.plots import Annotator
+
+if TYPE_CHECKING:
+    import os
+
+    import cv2.typing as cv2t
+    import numpy.typing as npt
+    from click._termui_impl import ProgressBar
+
 
 from .detection import Detector
 from .sources import SourceAdapter
@@ -92,8 +97,8 @@ class VideoAnalysis:
             max_det=self._settings["detector"]["max_det"],
         )
         imgsz = self._detector.imgsz
-        stride: int = self._detector.model.stride  # pyright: ignore # Typing issue.
-        pt: bool = self._detector.model.pt  # pyright: ignore # Typing issue.
+        stride: int = self._detector.model.stride  # pyright: ignore[reportGeneralTypeIssues] # Typing issue.
+        pt: bool = self._detector.model.pt  # pyright: ignore[reportGeneralTypeIssues] # Typing issue.
 
         # Load data again
         self._dataset = SourceAdapter(video, imgsz, stride, pt, step=every_nth_frame)
@@ -161,8 +166,7 @@ class VideoAnalysis:
 
         if self._ui is None or self._ui.render():
             while self._ui is not None and self._ui.render():
-                # pylint: disable-next=undefined-loop-variable
-                self._draw(original_image)  # pyright: ignore # Is always present.
+                self._draw(original_image)  # pyright: ignore[reportUnboundVariable] # Is always present.
 
             # Only save statistics if video was played back completely
             self._statistics.save(self._world_model.game_state.basename)
@@ -188,7 +192,7 @@ class VideoAnalysis:
                 np.array(self._world_model.camera.background) if self._settings["view"]["background"] else image
             )
 
-    def _draw_image(self, image: npt.NDArray[np.uint8]) -> None:
+    def _draw_image(self, image: cv2t.MatLike) -> None:
         """Draws an image view.
 
         :param image: Draw onto this image or use it to draw segmentation masks.
@@ -218,7 +222,7 @@ class VideoAnalysis:
             image = image.copy()
 
             if self._settings["view"]["field_lines"]:
-                self._world_model.field.draw_on_image(image)
+                self._world_model.field.draw_on_image(image)  # pyright: ignore[reportGeneralTypeIssues]
 
             if self._settings["view"]["boxes"]:
                 # Add labels to image

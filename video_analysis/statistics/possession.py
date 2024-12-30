@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import cairo
 import cv2
 import numpy as np
 import numpy.typing as npt
 
-from ..world_model import WorldModel
-from ..world_model.players import Player
-
 if TYPE_CHECKING:
+    import cairo
+
+    from ..world_model import WorldModel
+    from ..world_model.players import Player
     from .ball_movement_time import BallMovementTime
     from .distance_counter import DistanceCounter
 
@@ -192,4 +192,10 @@ class Possession:
         ):
             player_in_image = self._world_model.camera.world2image(self._player_in_ball_possession.position)
             ball_in_image = self._world_model.camera.world2image(self._world_model.ball.position)
-            cv2.line(image, player_in_image.astype(np.int32), ball_in_image.astype(np.int32), (0, 128, 255), 3)
+            cv2.line(
+                image,
+                player_in_image.astype(np.int32).tolist(),
+                ball_in_image.astype(np.int32).tolist(),
+                (0, 128, 255),
+                3,
+            )

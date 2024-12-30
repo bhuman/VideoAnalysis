@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-import numpy as np
-import numpy.typing as npt
+from typing import TYPE_CHECKING
 
-from ..world_model import WorldModel
-from .possession import Possession
+import numpy as np
+
+if TYPE_CHECKING:
+    import numpy.typing as npt
+
+    from ..world_model import WorldModel
+    from .possession import Possession
 
 
 class DistanceCounter:

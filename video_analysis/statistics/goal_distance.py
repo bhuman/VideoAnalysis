@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import numpy.typing as npt
 
-from ..world_model import WorldModel
+if TYPE_CHECKING:
+    from ..world_model import WorldModel
 
 
 class GoalDistance:

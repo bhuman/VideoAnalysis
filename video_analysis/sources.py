@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
-import numpy as np
-import numpy.typing as npt
 from yolov5.utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
 from yolov5.utils.general import check_file
+
+if TYPE_CHECKING:
+    import numpy as np
+    import numpy.typing as npt
 
 
 class SourceAdapter:
@@ -80,4 +83,4 @@ class SourceAdapter:
             preprocessed = preprocessed[0, ...]
             original = original[0]
         self._skip = self._step - 1
-        return preprocessed, original  # pyright: ignore # MAT == NDArray[uint8]
+        return preprocessed, original  # pyright: ignore[reportGeneralTypeIssues] # MAT == NDArray[uint8]

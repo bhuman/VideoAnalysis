@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-import os
+from typing import TYPE_CHECKING
 
-import numpy as np
-import numpy.typing as npt
 import torch
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import check_img_size, non_max_suppression, scale_boxes
 from yolov5.utils.torch_utils import select_device
+
+if TYPE_CHECKING:
+    import os
+
+    import numpy as np
+    import numpy.typing as npt
 
 
 class Detector:
@@ -53,9 +57,13 @@ class Detector:
         with torch.no_grad():
             self._device: torch.device = select_device(device)
             self.model = DetectMultiBackend(
-                weights, device=self._device, dnn=dnn, data=data, fp16=half  # type: ignore[arg-type]
+                weights,  # pyright: ignore[reportGeneralTypeIssues]
+                device=self._device,
+                dnn=dnn,
+                data=data,
+                fp16=half,
             )
-            self.imgsz: list[int] = check_img_size(imgsz, s=self.model.stride)  # pyright: ignore
+            self.imgsz: list[int] = check_img_size(imgsz, s=self.model.stride)  # pyright: ignore[reportGeneralTypeIssues]
             assert isinstance(self.imgsz, list)
 
             self.model.warmup(imgsz=(1, 3, *self.imgsz))

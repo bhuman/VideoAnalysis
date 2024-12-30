@@ -9,12 +9,11 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
 import cv2
 import numpy as np
-import numpy.typing as npt
 from matplotlib import pyplot as plt
 from scipy import optimize
 from scipy.spatial import cKDTree as KDTree
@@ -22,7 +21,12 @@ from scipy.spatial.transform import Rotation as R
 from telemetry_parser import Parser as GPMFParser  # type: ignore[attr-defined]
 
 from .sources import SourceAdapter
-from .world_model.field import Field
+
+if TYPE_CHECKING:
+    import cv2.typing as cv2t
+    import numpy.typing as npt
+
+    from .world_model.field import Field
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +185,7 @@ class Camera:
         """
         self.fps: float = fps
         self._settings: dict[str, Any] = settings
-        self.background: cv2.Mat | None = None
+        self.background: cv2t.MatLike | None = None
         self._extrinsics: Extrinsics | None = None
         self.intrinsics: Intrinsics | None = None
 
@@ -274,7 +278,7 @@ class Camera:
                     run_number += 1
                 path = camera_path.joinpath(f"run_{run_number}")
                 path.mkdir()
-                _, (ax1, ax2) = plt.subplots(2, 1)  # pyright: ignore
+                _, (ax1, ax2) = plt.subplots(2, 1)  # pyright: ignore[reportGeneralTypeIssues]
                 ax1.set_aspect("equal")
                 # Here, the first parameter is for the horizontal axis, the second for the vertical one.
                 ax1.plot(points_original[:, 0], self.background.shape[0] - points_original[:, 1], ".")
@@ -332,7 +336,7 @@ class Camera:
         return points_in_image[0] if single else points_in_image
 
     @staticmethod
-    def _read_video_background(dataset: SourceAdapter, images: int) -> cv2.Mat:
+    def _read_video_background(dataset: SourceAdapter, images: int) -> cv2t.MatLike:
         """Determine the video background from a list of images.
 
         This only works if foreground objects move sufficiently in the dataset.
@@ -350,7 +354,7 @@ class Camera:
         return subtractor.getBackgroundImage()
 
     @staticmethod
-    def _skeleton(mask: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    def _skeleton(mask: cv2t.MatLike) -> cv2t.MatLike:
         """Create the skeleton of a mask.
 
         :param mask: The mask containing the field lines.
@@ -376,7 +380,7 @@ class Camera:
 
         return skeleton_
 
-    def _field_mask(self, image: cv2.Mat) -> npt.NDArray[np.uint8]:
+    def _field_mask(self, image: cv2t.MatLike) -> cv2t.MatLike:
         """Generate mask from the image that only contains the field lines.
 
         :param image: The image.
@@ -390,21 +394,23 @@ class Camera:
         upper_green = np.array(self._settings["green_mask"]["max"])
         mask_field = cv2.inRange(hsv, lower_green, upper_green)
 
+        element = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+
         # Remove noise.
-        mask_field = cv2.erode(mask_field, None, iterations=3)
-        mask_field = cv2.dilate(mask_field, None, iterations=3)
+        mask_field = cv2.erode(mask_field, element, iterations=3)
+        mask_field = cv2.dilate(mask_field, element, iterations=3)
 
         # Close the lines inside the field.
-        mask_field = cv2.dilate(mask_field, None, iterations=20)
+        mask_field = cv2.dilate(mask_field, element, iterations=20)
 
         # Remove green bits outside the field.
-        mask_field = cv2.erode(mask_field, None, iterations=40)
+        mask_field = cv2.erode(mask_field, element, iterations=40)
 
         # Bring back field to its original size.
-        mask_field = cv2.dilate(mask_field, None, iterations=20)
+        mask_field = cv2.dilate(mask_field, element, iterations=20)
 
         # Remove some noise at the edges.
-        mask_field = cv2.erode(mask_field, None, iterations=3)
+        mask_field = cv2.erode(mask_field, element, iterations=3)
 
         # White mask
         lower_white = np.array(self._settings["white_mask"]["min"])
@@ -416,7 +422,7 @@ class Camera:
         return cv2.bitwise_and(mask_field, mask_white)
 
     @staticmethod
-    def _remove_singular_points(mask: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    def _remove_singular_points(mask: cv2t.MatLike) -> cv2t.MatLike:
         """Remove points without any neighbors from the mask
 
         :param mask: The image mask.
@@ -428,7 +434,7 @@ class Camera:
                     mask[i, j] = 0
         return mask
 
-    def _detect_lines(self, image: cv2.Mat) -> npt.NDArray[np.float_]:
+    def _detect_lines(self, image: cv2t.MatLike) -> npt.NDArray[np.float_]:
         """Detect points on field lines in an image.
 
         :param image: The image. Ideally, in the area of the field no objects are present.
@@ -437,7 +443,7 @@ class Camera:
         mask_line = self._field_mask(image)
         skeleton_ = self._skeleton(mask_line)
         skeleton_ = self._remove_singular_points(skeleton_)
-        points = np.array(np.where(skeleton_ > 0)).T.astype(float)
+        points = np.array(np.where(skeleton_ > 0)).T.astype(float)  # pyright: ignore[reportGeneralTypeIssues]
         return points[:, ::-1]
 
     @staticmethod
@@ -688,10 +694,10 @@ class Camera:
 
         # middle circle
         number_of_steps = (np.pi * field.center_circle_diameter) / step
-        for a in np.arange(-np.pi, np.pi, 2.0 * np.pi / number_of_steps):
-            points.append(
-                [field.center_circle_diameter * np.sin(a) * 0.5, field.center_circle_diameter * np.cos(a) * 0.5]
-            )
+        points += [
+            [field.center_circle_diameter * np.sin(a) * 0.5, field.center_circle_diameter * np.cos(a) * 0.5]
+            for a in np.arange(-np.pi, np.pi, 2.0 * np.pi / number_of_steps)
+        ]
 
         return np.array(points).astype(float)
 
@@ -721,8 +727,7 @@ class Camera:
     def _filter_outliers(
         model: npt.NDArray[np.float_], model_as_tree: KDTree, data: npt.NDArray[np.float_], max_error: float
     ) -> list[int]:
-        """
-        Filter outliers from the measured points on field lines that are too far away from model points.
+        """Filter outliers from the measured points on field lines that are too far away from model points.
 
         :param model: A list of points on field lines created from the model.
         :param model_as_tree: The model points in a kd tree.

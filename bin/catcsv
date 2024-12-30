@@ -13,12 +13,12 @@ def main(paths: list[Path]) -> None:
 
     :param paths: The paths of the files to print.
     """
-    firstLine: int = 0
+    first_line: int = 0
     for path in paths:
         with path.open(encoding="UTF-8", newline="") as file_:
-            for line in file_.read().splitlines()[firstLine:]:
+            for line in file_.read().splitlines()[first_line:]:
                 print(line)
-        firstLine = 1
+        first_line = 1
 
 
 if __name__ == "__main__":
@@ -40,4 +40,4 @@ if __name__ == "__main__":
         """
         main(csv_files)
 
-    cli()  # pylint: disable=no-value-for-parameter
+    cli()

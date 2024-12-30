@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import platform
 from copy import deepcopy
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import cv2
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from .world_model.team import Team
+if TYPE_CHECKING:
+    from .world_model.team import Team
 
 
 class Size(NamedTuple):
@@ -70,13 +71,13 @@ class UI:
 
         # Register the image and two field views as textures to be used in the three tabs.
         with dpg.texture_registry():
-            dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="video")  # pyright: ignore
-            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="field")  # pyright: ignore
-            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="ball")  # pyright: ignore
-            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="left")  # pyright: ignore
-            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="right")  # pyright: ignore
-            dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="green")  # pyright: ignore
-            dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="white")  # pyright: ignore
+            dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="video")  # pyright: ignore[reportGeneralTypeIssues]
+            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="field")  # pyright: ignore[reportGeneralTypeIssues]
+            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="ball")  # pyright: ignore[reportGeneralTypeIssues]
+            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="left")  # pyright: ignore[reportGeneralTypeIssues]
+            dpg.add_dynamic_texture(field.shape[1], field.shape[0], field, tag="right")  # pyright: ignore[reportGeneralTypeIssues]
+            dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="green")  # pyright: ignore[reportGeneralTypeIssues]
+            dpg.add_dynamic_texture(image.shape[1], image.shape[0], image, tag="white")  # pyright: ignore[reportGeneralTypeIssues]
 
         # Create the whole ui (menu, team 0 left, tabs center, team 1 right).
         with dpg.window(
@@ -203,7 +204,12 @@ class UI:
         """
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGRA)
         image = cv2.normalize(
-            image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F  # pyright: ignore # Wrong stubs.
+            image,
+            None,  # pyright: ignore[reportGeneralTypeIssues] # Wrong stubs.
+            alpha=0,
+            beta=1,
+            norm_type=cv2.NORM_MINMAX,
+            dtype=cv2.CV_32F,  # pyright: ignore[reportGeneralTypeIssues] # Wrong stubs.
         )
         dpg.set_value(type_, image)
 
@@ -215,7 +221,12 @@ class UI:
         """
         field = cv2.cvtColor(field, cv2.COLOR_RGB2BGRA)
         field = cv2.normalize(
-            field, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F  # pyright: ignore # Wrong stubs.
+            field,
+            None,  # pyright: ignore[reportGeneralTypeIssues] # Wrong stubs.
+            alpha=0,
+            beta=1,
+            norm_type=cv2.NORM_MINMAX,
+            dtype=cv2.CV_32F,  # pyright: ignore[reportGeneralTypeIssues] # Wrong stubs.
         )
         dpg.set_value(type_, field)
 

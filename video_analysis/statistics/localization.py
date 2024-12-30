@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import cairo
 import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -10,6 +9,7 @@ from scipy.optimize import linear_sum_assignment
 from video_analysis.world_model.players import Player
 
 if TYPE_CHECKING:
+    import cairo
     import numpy.typing as npt
 
     from video_analysis.camera import Camera
@@ -88,10 +88,10 @@ class Localization:
     _player_valid_delay = 2
     """Time in seconds a world model player has to associated to a status to count."""
 
-    _returning_thresholds: list[float] = [-0.1, 0.5]
+    _returning_thresholds: tuple[float, float] = (-0.1, 0.5)
     """Thresholds around points where robots return from penalties ((x, y) in m)."""
 
-    _penalized_thresholds: list[float] = [1, 0.2]
+    _penalized_thresholds: tuple[float, float] = (1, 0.2)
     """Thresholds around points where robots stand when penalized ((x, y) in m)."""
 
     def __init__(self, world_model: WorldModel, categories: dict[str, list], settings: dict[str, Any]) -> None:
@@ -233,13 +233,13 @@ class Localization:
             player_num - 1
         ]
         penalized: bool = player["penalty"] != "noPenalty" and player["penalty"] != "motionInSet"
-        returnUncertain: bool = player["penalty"] == "substitute" or player["penalty"] == "pickedUp"
+        return_uncertain: bool = player["penalty"] == "substitute" or player["penalty"] == "pickedUp"
         remaining: int = (
             0 if player["penaltyTimer"] == "stopped" else player["penaltyTimer"]["!started"]["remaining"][0]
         )
         self._player_statuses[team][str(player_num)].penalized = penalized
         self._player_statuses[team][str(player_num)].returning_soon = (
-            penalized and not returnUncertain and remaining < 10
+            penalized and not return_uncertain and remaining < 10
         )
         goalkeeper: bool = self._world_model.game_state.current_game_state["teams"][side]["goalkeeper"] == player_num
         self._player_statuses[team][str(player_num)].color = Player.Color.from_str(

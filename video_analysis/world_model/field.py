@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 from math import ceil
 from typing import TYPE_CHECKING, Any
 
-import cairo
 import cv2
 import numpy as np
-import numpy.typing as npt
 
 if TYPE_CHECKING:
+    import os
+
+    import cairo
+    import numpy.typing as npt
+
     from . import WorldModel
 
 
@@ -202,6 +204,5 @@ class Field:
                 offset = point - last_point
                 length = np.linalg.norm(offset)
                 steps = int(ceil(length / self._max_line_length))
-                for j in range(1, steps + 1):
-                    result.append(last_point + offset * j / steps)
+                result += [last_point + offset * j / steps for j in range(1, steps + 1)]
         return np.asarray(result)
