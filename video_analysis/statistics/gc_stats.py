@@ -24,9 +24,10 @@ class GCStats:
                 "Penalties": [0, 0],
                 "Illegal Ball Contact": [0, 0, "", "Ill. Ball Contact"],
                 "Player Pushing": [0, 0],
-                "Illegal Motion in Set": [0, 0, "", "Ill. Motion in Set"],
+                "Motion in Standby": [0, 0],
+                "Motion in Set": [0, 0],
                 "Inactive Player": [0, 0],
-                "Illegal Position": [0, 0, "", "Ill. Position"],
+                "Illegal Position": [0, 0],
                 "Leaving the Field": [0, 0],
                 "Request for PickUp": [0, 0],
                 "Pushing Free Kick": [0, 0],
@@ -67,8 +68,10 @@ class GCStats:
                     category = "Illegal Position"
                 elif "leavingTheField" in args["call"]:
                     category = "Leaving the Field"
+                elif "motionInStandby" in args["call"]:
+                    category = "Motion in Standby"
                 elif "motionInSet" in args["call"]:
-                    category = "Illegal Motion in Set"
+                    category = "Motion in Set"
                 elif "pushing" in args["call"]:
                     category = "Player Pushing"
                 elif "fallenInactive" in args["call"]:
@@ -108,7 +111,8 @@ class GCStats:
         if category in (
             "Illegal Ball Contact",
             "Player Pushing",
-            "Illegal Motion in Set",
+            "Motion in Standby",
+            "Motion in Set",
             "Inactive Player",
             "Illegal Position",
             "Leaving the Field",
