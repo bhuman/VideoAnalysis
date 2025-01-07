@@ -28,6 +28,7 @@ class GCStats:
                 "Motion in Set": [0, 0],
                 "Inactive Player": [0, 0],
                 "Illegal Position": [0, 0],
+                "Illegal Position in Set": [0, 0, "", "  in Set"],
                 "Leaving the Field": [0, 0],
                 "Request for PickUp": [0, 0],
                 "Pushing Free Kick": [0, 0],
@@ -63,9 +64,11 @@ class GCStats:
             if "penalize" in current_action["type"] and "unpenalize" not in current_action["type"]:
                 team: Literal[0, 1] = 0 if self._world_model.game_state.teams[0].side in args["side"] else 1
                 if "illegalPosition" in args["call"]:
-                    category = "Illegal Position"
-                elif "illegalPositionInSet" in args["call"]:
-                    category = "Illegal Position"
+                    category = (
+                        "Illegal Position in Set"
+                        if self._world_model.game_state.state == self._world_model.game_state.State.SET
+                        else "Illegal Position"
+                    )
                 elif "leavingTheField" in args["call"]:
                     category = "Leaving the Field"
                 elif "motionInStandby" in args["call"]:
@@ -115,6 +118,7 @@ class GCStats:
             "Motion in Set",
             "Inactive Player",
             "Illegal Position",
+            "Illegal Position in Set",
             "Leaving the Field",
         ):
             self._categories["Penalties"][team] += 1
